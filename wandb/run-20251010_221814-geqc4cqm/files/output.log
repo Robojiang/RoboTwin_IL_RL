@@ -1,0 +1,73 @@
+Creating RL model...
+Using cuda device
+Wrapping the env with a `Monitor` wrapper
+Wrapping the env in a DummyVecEnv.
+Starting RL training for 100000 steps...
+Attempt 1/10: Unstable object detected with seed 6890. Trying a different seed.
+step: [92m22 / 400[0mm
+Traceback (most recent call last):
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 458, in <module>
+    model_path = train_rl(usr_args)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 408, in train_rl
+    ppo_model.learn(
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 311, in learn
+    return super().learn(
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 324, in learn
+    continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 218, in collect_rollouts
+    new_obs, rewards, dones, infos = env.step(clipped_actions)
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/vec_env/base_vec_env.py", line 222, in step
+    return self.step_wait()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/vec_env/dummy_vec_env.py", line 59, in step_wait
+    obs, self.buf_rews[env_idx], terminated, truncated, self.buf_infos[env_idx] = self.envs[env_idx].step(  # type: ignore[assignment]
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/monitor.py", line 94, in step
+    observation, reward, terminated, truncated, info = self.env.step(action)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 168, in step
+    self.task_env.take_action(final_action)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/_base_task.py", line 1677, in take_action
+    if self.check_success():
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/beat_block_hammer.py", line 83, in check_success
+    hammer_target_pose = self.hammer.get_functional_point(0, "pose").p
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/utils/actor_utils.py", line 76, in get_functional_point
+    return self.get_point("functional", idx, ret)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/utils/actor_utils.py", line 52, in get_point
+    return sapien.Pose(world_matrix[:3, 3], t3d.quaternions.mat2quat(world_matrix[:3, :3]))
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/transforms3d/quaternions.py", line 211, in mat2quat
+    vals, vecs = np.linalg.eigh(K)
+  File "<__array_function__ internals>", line 180, in eigh
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/numpy/linalg/linalg.py", line 1465, in eigh
+    w, vt = gufunc(a, signature=signature, extobj=extobj)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 458, in <module>
+    model_path = train_rl(usr_args)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 408, in train_rl
+    ppo_model.learn(
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 311, in learn
+    return super().learn(
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 324, in learn
+    continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 218, in collect_rollouts
+    new_obs, rewards, dones, infos = env.step(clipped_actions)
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/vec_env/base_vec_env.py", line 222, in step
+    return self.step_wait()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/vec_env/dummy_vec_env.py", line 59, in step_wait
+    obs, self.buf_rews[env_idx], terminated, truncated, self.buf_infos[env_idx] = self.envs[env_idx].step(  # type: ignore[assignment]
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/stable_baselines3/common/monitor.py", line 94, in step
+    observation, reward, terminated, truncated, info = self.env.step(action)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 168, in step
+    self.task_env.take_action(final_action)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/_base_task.py", line 1677, in take_action
+    if self.check_success():
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/beat_block_hammer.py", line 83, in check_success
+    hammer_target_pose = self.hammer.get_functional_point(0, "pose").p
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/utils/actor_utils.py", line 76, in get_functional_point
+    return self.get_point("functional", idx, ret)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/./envs/utils/actor_utils.py", line 52, in get_point
+    return sapien.Pose(world_matrix[:3, 3], t3d.quaternions.mat2quat(world_matrix[:3, :3]))
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/transforms3d/quaternions.py", line 211, in mat2quat
+    vals, vecs = np.linalg.eigh(K)
+  File "<__array_function__ internals>", line 180, in eigh
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/numpy/linalg/linalg.py", line 1465, in eigh
+    w, vt = gufunc(a, signature=signature, extobj=extobj)
+KeyboardInterrupt

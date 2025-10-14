@@ -1,0 +1,90 @@
+_wandb:
+    value:
+        cli_version: 0.21.3
+        e:
+            i7ymqbxi2084u59u36jrlxxrvhdrn6l4:
+                args:
+                    - --config
+                    - policy/DP3/deploy_policy.yml
+                    - --overrides
+                    - --task_name
+                    - beat_block_hammer
+                    - --task_config
+                    - demo_tao_for_dp3
+                    - --ckpt_setting
+                    - demo_tao_for_dp3
+                    - --expert_data_num
+                    - "50"
+                    - --seed
+                    - "0"
+                    - --policy_name
+                    - DP3
+                codePath: script/residual_train.py
+                codePathLocal: script/residual_train.py
+                cpu_count: 12
+                cpu_count_logical: 20
+                cudaVersion: "12.2"
+                disk:
+                    /:
+                        total: "368274382848"
+                        used: "248065175552"
+                email: 1481350622@qq.com
+                executable: /home/tao/anaconda3/envs/RoboTwin/bin/python
+                git:
+                    commit: a93e2d0578a7a2367749ea9e57af538aa93576aa
+                    remote: git@github.com:Robojiang/RoboTwin_IL_RL.git
+                gpu: NVIDIA GeForce RTX 3060
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 3584
+                      memoryTotal: "12884901888"
+                      name: NVIDIA GeForce RTX 3060
+                      uuid: GPU-0741053f-61d7-f8ea-5c91-eb65af07f777
+                host: tao-B760M-AORUS-ELITE-DDR4
+                memory:
+                    total: "67245150208"
+                os: Linux-6.8.0-85-generic-x86_64-with-glibc2.35
+                program: /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py
+                python: CPython 3.10.18
+                root: /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin
+                startedAt: "2025-10-10T13:03:10.078295Z"
+                writerId: i7ymqbxi2084u59u36jrlxxrvhdrn6l4
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+                - 5
+                - 41
+                - 49
+                - 50
+                - 53
+                - 83
+            "2":
+                - 1
+                - 5
+                - 41
+                - 49
+                - 50
+                - 53
+                - 83
+            "3":
+                - 13
+                - 16
+            "4": 3.10.18
+            "5": 0.21.3
+            "12": 0.21.3
+            "13": linux-x86_64
+config:
+    value: demo_tao_for_dp3
+date:
+    value: 2025-10-10_21-03-03
+learning_rate:
+    value: 0.0003
+policy:
+    value: DP3
+task:
+    value: beat_block_hammer
+total_timesteps:
+    value: 100000

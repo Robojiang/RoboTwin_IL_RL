@@ -1,0 +1,57 @@
+{
+  "os": "Linux-6.8.0-85-generic-x86_64-with-glibc2.35",
+  "python": "CPython 3.10.18",
+  "startedAt": "2025-10-13T05:00:51.313995Z",
+  "args": [
+    "--config",
+    "policy/DP3/deploy_policy.yml",
+    "--overrides",
+    "--task_name",
+    "beat_block_hammer",
+    "--task_config",
+    "demo_tao_for_dp3",
+    "--ckpt_setting",
+    "demo_tao_for_dp3",
+    "--expert_data_num",
+    "50",
+    "--seed",
+    "0",
+    "--policy_name",
+    "DP3"
+  ],
+  "program": "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py",
+  "codePath": "script/residual_train.py",
+  "codePathLocal": "script/residual_train.py",
+  "git": {
+    "remote": "git@github.com:Robojiang/RoboTwin_IL_RL.git",
+    "commit": "a93e2d0578a7a2367749ea9e57af538aa93576aa"
+  },
+  "email": "1481350622@qq.com",
+  "root": "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin",
+  "host": "tao-B760M-AORUS-ELITE-DDR4",
+  "executable": "/home/tao/anaconda3/envs/RoboTwin/bin/python",
+  "cpu_count": 12,
+  "cpu_count_logical": 20,
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "368274382848",
+      "used": "247569076224"
+    }
+  },
+  "memory": {
+    "total": "67245142016"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 3060",
+      "memoryTotal": "12884901888",
+      "cudaCores": 3584,
+      "architecture": "Ampere",
+      "uuid": "GPU-0741053f-61d7-f8ea-5c91-eb65af07f777"
+    }
+  ],
+  "cudaVersion": "12.2",
+  "writerId": "6pqvmhydo82leuojspb60xv5475isx2r"
+}

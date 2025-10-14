@@ -1,0 +1,75 @@
+_wandb:
+    value:
+        cli_version: 0.21.3
+        e:
+            frww1c0hewlvqn4cn7m19uhg3ucxpsua:
+                args:
+                    - --config
+                    - policy/DP3/deploy_policy.yml
+                    - --overrides
+                    - --task_name
+                    - beat_block_hammer
+                    - --task_config
+                    - demo_tao_for_dp3
+                    - --ckpt_setting
+                    - demo_tao_for_dp3
+                    - --expert_data_num
+                    - "50"
+                    - --seed
+                    - "0"
+                    - --policy_name
+                    - DP3
+                codePath: script/residual_train.py
+                codePathLocal: script/residual_train.py
+                email: 1481350622@qq.com
+                executable: /home/tao/anaconda3/envs/RoboTwin/bin/python
+                git:
+                    commit: a93e2d0578a7a2367749ea9e57af538aa93576aa
+                    remote: git@github.com:Robojiang/RoboTwin_IL_RL.git
+                host: tao-B760M-AORUS-ELITE-DDR4
+                os: Linux-6.8.0-85-generic-x86_64-with-glibc2.35
+                program: /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py
+                python: CPython 3.10.18
+                root: /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin
+                startedAt: "2025-10-10T14:15:17.520008Z"
+                writerId: frww1c0hewlvqn4cn7m19uhg3ucxpsua
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+                - 5
+                - 41
+                - 49
+                - 50
+                - 53
+                - 83
+            "2":
+                - 1
+                - 5
+                - 41
+                - 49
+                - 50
+                - 53
+                - 83
+            "3":
+                - 13
+                - 16
+            "4": 3.10.18
+            "5": 0.21.3
+            "12": 0.21.3
+            "13": linux-x86_64
+config:
+    value: demo_tao_for_dp3
+date:
+    value: 2025-10-10_22-15-10
+learning_rate:
+    value: 0.0003
+policy:
+    value: DP3
+seed:
+    value: 0
+task:
+    value: beat_block_hammer
+total_timesteps:
+    value: 100000

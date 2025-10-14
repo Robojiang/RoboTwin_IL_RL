@@ -1,0 +1,20 @@
+Creating RL model...
+Using cuda device
+Wrapping the env with a `Monitor` wrapper
+Wrapping the env in a DummyVecEnv.
+Traceback (most recent call last):
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 459, in <module>
+    model_path = train_rl(usr_args)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 405, in train_rl
+    wandb_callback = WandbCallback()
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 354, in __init__
+    self.training_env = None
+AttributeError: can't set attribute 'training_env'
+Traceback (most recent call last):
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 459, in <module>
+    model_path = train_rl(usr_args)
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 405, in train_rl
+    wandb_callback = WandbCallback()
+  File "/media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/script/residual_train.py", line 354, in __init__
+    self.training_env = None
+AttributeError: can't set attribute 'training_env'

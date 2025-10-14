@@ -1,0 +1,166 @@
+2025-10-10 21:00:10,518 INFO    MainThread:277258 [wandb_setup.py:_flush():81] Current SDK version is 0.21.3
+2025-10-10 21:00:10,518 INFO    MainThread:277258 [wandb_setup.py:_flush():81] Configure stats pid to 277258
+2025-10-10 21:00:10,518 INFO    MainThread:277258 [wandb_setup.py:_flush():81] Loading settings from /home/tao/.config/wandb/settings
+2025-10-10 21:00:10,518 INFO    MainThread:277258 [wandb_setup.py:_flush():81] Loading settings from /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/wandb/settings
+2025-10-10 21:00:10,519 INFO    MainThread:277258 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2025-10-10 21:00:10,519 INFO    MainThread:277258 [wandb_init.py:setup_run_log_directory():686] Logging user logs to /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/wandb/run-20251010_210010-xboqibkh/logs/debug.log
+2025-10-10 21:00:10,519 INFO    MainThread:277258 [wandb_init.py:setup_run_log_directory():687] Logging internal logs to /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/wandb/run-20251010_210010-xboqibkh/logs/debug-internal.log
+2025-10-10 21:00:10,520 INFO    MainThread:277258 [wandb_init.py:init():813] calling init triggers
+2025-10-10 21:00:10,520 INFO    MainThread:277258 [wandb_init.py:init():818] wandb.init called with sweep_config: {}
+config: {'task': 'beat_block_hammer', 'config': 'demo_tao_for_dp3', 'policy': 'DP3', 'learning_rate': 0.0003, 'total_timesteps': 100000, 'date': '2025-10-10_21-00-04', '_wandb': {}}
+2025-10-10 21:00:10,520 INFO    MainThread:277258 [wandb_init.py:init():854] starting backend
+2025-10-10 21:00:10,734 INFO    MainThread:277258 [wandb_init.py:init():857] sending inform_init request
+2025-10-10 21:00:10,741 INFO    MainThread:277258 [wandb_init.py:init():865] backend started and connected
+2025-10-10 21:00:10,743 INFO    MainThread:277258 [wandb_init.py:init():936] updated telemetry
+2025-10-10 21:00:10,753 INFO    MainThread:277258 [wandb_init.py:init():960] communicating run to backend with 90.0 second timeout
+2025-10-10 21:00:12,618 INFO    MainThread:277258 [wandb_init.py:init():1011] starting run threads in backend
+2025-10-10 21:00:12,735 INFO    MainThread:277258 [wandb_run.py:_console_start():2494] atexit reg
+2025-10-10 21:00:12,735 INFO    MainThread:277258 [wandb_run.py:_redirect():2342] redirect: wrap_raw
+2025-10-10 21:00:12,735 INFO    MainThread:277258 [wandb_run.py:_redirect():2411] Wrapping output streams.
+2025-10-10 21:00:12,735 INFO    MainThread:277258 [wandb_run.py:_redirect():2434] Redirects installed.
+2025-10-10 21:00:12,737 INFO    MainThread:277258 [wandb_init.py:init():1057] run started, returning control to user process
+2025-10-10 21:02:50,317 INFO    wandb-AsyncioManager-main:277258 [service_client.py:_forward_responses():84] Reached EOF.
+2025-10-10 21:02:50,317 INFO    wandb-AsyncioManager-main:277258 [mailbox.py:close():137] Closing mailbox, abandoning 1 handles.
+2025-10-10 21:02:52,892 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,895 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,898 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,898 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,899 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,899 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,899 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,899 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,899 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,899 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,900 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,900 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2025-10-10 21:02:52,901 ERROR   wandb-AsyncioManager-main:277258 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/site-packages/wandb/sdk/lib/service/service_client.py", line 65, in _send_server_request
+    await self._writer.drain()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 371, in drain
+    await self._protocol._drain_helper()
+  File "/home/tao/anaconda3/envs/RoboTwin/lib/python3.10/asyncio/streams.py", line 167, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost

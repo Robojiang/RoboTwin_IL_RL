@@ -1,0 +1,12 @@
+{"time":"2025-10-12T21:39:49.13614221+08:00","level":"INFO","msg":"stream: starting","core version":"0.21.3"}
+{"time":"2025-10-12T21:39:52.442987729+08:00","level":"INFO","msg":"stream: created new stream","id":"x1ophzm5"}
+{"time":"2025-10-12T21:39:52.443173972+08:00","level":"INFO","msg":"stream: started","id":"x1ophzm5"}
+{"time":"2025-10-12T21:39:52.443292102+08:00","level":"INFO","msg":"writer: started","stream_id":"x1ophzm5"}
+{"time":"2025-10-12T21:39:52.443345829+08:00","level":"INFO","msg":"handler: started","stream_id":"x1ophzm5"}
+{"time":"2025-10-12T21:39:52.443370561+08:00","level":"INFO","msg":"sender: started","stream_id":"x1ophzm5"}
+{"time":"2025-10-13T03:02:54.449112847+08:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://api.wandb.ai/files/1481350622-harbin-institute-of-technology/robotwin-rl-beat_block_hammer/x1ophzm5/file_stream","body":"\n<html><head>\n<meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\">\n<title>502 Server Error</title>\n</head>\n<body text=#000000 bgcolor=#ffffff>\n<h1>Error: Server Error</h1>\n<h2>The server encountered a temporary error and could not complete your request.<p>Please try again in 30 seconds.</h2>\n<h2></h2>\n</body></html>\n"}
+{"time":"2025-10-13T12:58:52.927194263+08:00","level":"INFO","msg":"stream: closing","id":"x1ophzm5"}
+{"time":"2025-10-13T12:58:55.003676115+08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-10-13T12:58:56.357394134+08:00","level":"INFO","msg":"handler: closed","stream_id":"x1ophzm5"}
+{"time":"2025-10-13T12:58:56.357723345+08:00","level":"INFO","msg":"sender: closed","stream_id":"x1ophzm5"}
+{"time":"2025-10-13T12:58:56.357768262+08:00","level":"INFO","msg":"stream: closed","id":"x1ophzm5"}
