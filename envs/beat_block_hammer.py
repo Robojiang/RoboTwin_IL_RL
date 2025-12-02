@@ -86,9 +86,3 @@ class beat_block_hammer(Base_Task):
         return np.all(abs(hammer_target_pose[:2] - block_pose[:2]) < eps) and self.check_actors_contact(
             self.hammer.get_name(), self.block.get_name())
     
-    def compute_reward(self):
-        # 自定义奖励函数
-        if self.check_success():  # 如果任务成功
-            return 1.0  # 成功奖励
-        else:
-            return -0.01  # 每步的惩罚

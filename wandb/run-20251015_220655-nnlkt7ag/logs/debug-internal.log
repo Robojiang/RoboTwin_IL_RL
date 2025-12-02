@@ -1,0 +1,12 @@
+{"time":"2025-10-15T22:06:55.690930086+08:00","level":"INFO","msg":"stream: starting","core version":"0.21.3"}
+{"time":"2025-10-15T22:06:56.853634683+08:00","level":"INFO","msg":"stream: created new stream","id":"nnlkt7ag"}
+{"time":"2025-10-15T22:06:56.853769108+08:00","level":"INFO","msg":"stream: started","id":"nnlkt7ag"}
+{"time":"2025-10-15T22:06:56.853911703+08:00","level":"INFO","msg":"sender: started","stream_id":"nnlkt7ag"}
+{"time":"2025-10-15T22:06:56.853794625+08:00","level":"INFO","msg":"handler: started","stream_id":"nnlkt7ag"}
+{"time":"2025-10-15T22:06:56.853876931+08:00","level":"INFO","msg":"writer: started","stream_id":"nnlkt7ag"}
+{"time":"2025-10-16T11:41:15.945699405+08:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"updating run metadata","runtime_seconds":0.000576496}],"total_operations":1}}
+{"time":"2025-10-16T11:41:17.796928706+08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-10-16T11:41:18.872770661+08:00","level":"INFO","msg":"stream: closing","id":"nnlkt7ag"}
+{"time":"2025-10-16T11:41:18.872844094+08:00","level":"INFO","msg":"handler: closed","stream_id":"nnlkt7ag"}
+{"time":"2025-10-16T11:41:18.872959998+08:00","level":"INFO","msg":"sender: closed","stream_id":"nnlkt7ag"}
+{"time":"2025-10-16T11:41:18.872998269+08:00","level":"INFO","msg":"stream: closed","id":"nnlkt7ag"}

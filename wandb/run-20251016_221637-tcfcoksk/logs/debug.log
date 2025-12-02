@@ -1,0 +1,23 @@
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_setup.py:_flush():81] Current SDK version is 0.21.3
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_setup.py:_flush():81] Configure stats pid to 1097398
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_setup.py:_flush():81] Loading settings from /home/tao/.config/wandb/settings
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_setup.py:_flush():81] Loading settings from /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/wandb/settings
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_init.py:setup_run_log_directory():686] Logging user logs to /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/wandb/run-20251016_221637-tcfcoksk/logs/debug.log
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_init.py:setup_run_log_directory():687] Logging internal logs to /media/tao/E8F6F2ECF6F2BA40/bimanial_manipulation/RoboTwin/wandb/run-20251016_221637-tcfcoksk/logs/debug-internal.log
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_init.py:init():813] calling init triggers
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_init.py:init():818] wandb.init called with sweep_config: {}
+config: {'task': 'beat_block_hammer', 'config': 'demo_tao_for_dp3', 'policy': 'DP3', 'learning_rate': 0.0003, 'total_timesteps': 300000, 'date': '2025-10-16_22-16-31', 'seed': 0, '_wandb': {}}
+2025-10-16 22:16:37,719 INFO    MainThread:1097398 [wandb_init.py:init():854] starting backend
+2025-10-16 22:16:37,925 INFO    MainThread:1097398 [wandb_init.py:init():857] sending inform_init request
+2025-10-16 22:16:37,934 INFO    MainThread:1097398 [wandb_init.py:init():865] backend started and connected
+2025-10-16 22:16:37,937 INFO    MainThread:1097398 [wandb_init.py:init():936] updated telemetry
+2025-10-16 22:16:37,959 INFO    MainThread:1097398 [wandb_init.py:init():960] communicating run to backend with 90.0 second timeout
+2025-10-16 22:16:39,818 INFO    MainThread:1097398 [wandb_init.py:init():1011] starting run threads in backend
+2025-10-16 22:16:39,906 INFO    MainThread:1097398 [wandb_run.py:_console_start():2494] atexit reg
+2025-10-16 22:16:39,906 INFO    MainThread:1097398 [wandb_run.py:_redirect():2342] redirect: wrap_raw
+2025-10-16 22:16:39,906 INFO    MainThread:1097398 [wandb_run.py:_redirect():2411] Wrapping output streams.
+2025-10-16 22:16:39,907 INFO    MainThread:1097398 [wandb_run.py:_redirect():2434] Redirects installed.
+2025-10-16 22:16:39,908 INFO    MainThread:1097398 [wandb_init.py:init():1057] run started, returning control to user process
+2025-10-16 22:25:02,010 INFO    wandb-AsyncioManager-main:1097398 [service_client.py:_forward_responses():84] Reached EOF.
+2025-10-16 22:25:02,010 INFO    wandb-AsyncioManager-main:1097398 [mailbox.py:close():137] Closing mailbox, abandoning 1 handles.

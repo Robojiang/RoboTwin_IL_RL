@@ -55,7 +55,7 @@ class RLPolicyEnvWrapper(gym.Env):
         # 初始化环境跟踪变量
         self.episode_id = 0
         self.steps_taken = 0
-        self.max_steps = args.get("step_lim", 300)
+        self.max_steps = args.get("step_lim", 400)
         self.episode_count = 0  # 用于跟踪完成的episode数
         self.reset_func = None
         self.clear_cache_freq = args.get("clear_cache_freq", 10)
@@ -163,7 +163,7 @@ class RLPolicyEnvWrapper(gym.Env):
             
         il_action = self.il_actions[self.il_action_index]
         
-        # 计算最终动作（IL 动作 + RL 残差）
+            # 计算最终动作（IL 动作 + RL 残差）
         final_action = il_action + rl_action
         
         # 执行动作
@@ -177,7 +177,7 @@ class RLPolicyEnvWrapper(gym.Env):
         }
         
         # 计算奖励
-        reward = self.compute_reward()
+        reward = self.compute_reward(rl_action)
         
         # 检查是否完成
         success = self.task_env.check_success()
@@ -200,27 +200,40 @@ class RLPolicyEnvWrapper(gym.Env):
         # 返回结果
         info = {"success": success}
         return encoded_obs, reward, terminated, truncated, info
-    
-    def compute_reward(self):
-        """
-        计算奖励函数。
-        """
-        # 调用环境的 compute_reward 方法（如果存在）
-        if hasattr(self.task_env, 'compute_reward'):
-            return self.task_env.compute_reward()
-        
-        # 否则使用基于成功状态的简单奖励
+
+    def compute_reward(self, rl_action):
+        """计算更细致的奖励函数"""
+        # 成功完成的基础奖励
         success = self.task_env.check_success()
-        
         if success:
-            # 成功完成任务的奖励
-            return 10.0
-        elif self.steps_taken >= self.max_steps:
-            # 达到最大步数的惩罚
-            return -1.0
-        else:
-            # 每步的小惩罚，鼓励尽快完成
-            return 0
+            return 30.0
+        
+        # 构建复合奖励
+        reward = 0.0
+        # 1. 距离奖励：鼓励锤子接近目标块
+        hammer_pose = self.task_env.hammer.get_functional_point(0, "pose").p
+        block_pose = self.task_env.block.get_functional_point(1, "pose").p
+        distance = np.linalg.norm(hammer_pose[:2] - block_pose[:2])  # 计算锤子和目标块的水平距离
+        reward += -0.1 * distance  # 距离越小，奖励越高
+
+        # 2. 动态残差惩罚
+        ratio = self.steps_taken / self.max_steps
+        il_action = self.il_actions[self.il_action_index]
+        rl_norm = np.linalg.norm(rl_action)
+        il_norm = np.linalg.norm(il_action)
+
+        # 根据任务进展动态调整惩罚力度
+        if ratio < 0.7:  # 前70%步数，强烈惩罚残差
+            reward -= 0.5 * rl_norm
+        else:  # 后30%步数，允许更大的残差
+            if rl_norm > il_norm:
+                reward -= 0.05 * (rl_norm - il_norm)  # 惩罚过大的残差
+
+        # 3. 生存奖励：鼓励智能体存活更长时间
+        reward += 0.01       
+    
+            
+        return reward
             
     def close(self):
         """关闭环境并清理资源"""
@@ -341,7 +354,7 @@ def train_rl(usr_args):
     rl_env.set_reset_func(reset_func)  # 设置模型重置函数
     
     # 设置RL模型参数
-    total_timesteps = usr_args.get("total_timesteps", 100000)
+    total_timesteps = usr_args.get("total_timesteps", 300000)
     learning_rate = usr_args.get("learning_rate", 0.0003)
     seed = usr_args.get("seed", None)
     
