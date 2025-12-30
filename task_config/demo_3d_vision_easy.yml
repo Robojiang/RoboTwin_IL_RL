@@ -7,13 +7,13 @@ save_freq: 15
 embodiment: [aloha-agilex]
 language_num: 1
 domain_randomization:
-  random_background: true
-  cluttered_table: true
-  clean_background_rate: 0.02
+  random_background: false
+  cluttered_table: false
+  clean_background_rate: 1
   random_head_camera_dis: 0
-  random_table_height: 0.03
-  random_light: true
-  crazy_random_light_rate: 0.02
+  random_table_height: 0
+  random_light: false
+  crazy_random_light_rate: 0
 camera:
   head_camera_type: D435
   wrist_camera_type: D435
@@ -22,16 +22,16 @@ camera:
 data_type:
   rgb: true
   third_view: false
-  depth: false
+  depth: true
   pointcloud: true
   observer: true
   endpose: true
   qpos: true
-  mesh_segmentation: false
-  actor_segmentation: false
+  mesh_segmentation: true
+  actor_segmentation: true
 pcd_down_sample_num: 1024
 pcd_crop: true
 save_path: ./data
 clear_cache_freq: 5
 collect_data: true
-eval_video_log: False
+eval_video_log: true

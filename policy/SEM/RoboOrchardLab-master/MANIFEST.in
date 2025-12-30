@@ -1,2 +1,0 @@
-recursive-include robo_orchard_lab *.cpp
-recursive-include robo_orchard_lab *.cu

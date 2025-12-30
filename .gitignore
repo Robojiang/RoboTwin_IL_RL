@@ -11,7 +11,7 @@ eval_video/
 
 **/.DS_Store
 
-policy/SEM/ckpt
+policy/SEM/RoboOrchardLab-master/projects/sem/robotwin/ckpt
 
 # eval result
 eval_result/
