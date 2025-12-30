@@ -29,4 +29,3 @@ envs/curobo/*
 /config.json
 
 /*.json*
-/*.txt
