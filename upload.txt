@@ -1,1 +1,1 @@
-rsync -avz --no-o --no-g -e "ssh -p 11074" ./demo_3d_vision_easy/ root@118.145.32.133:/mnt/afs/250010074/robot_manipulation/RoboTwin_IL_RL/data/beat_block_hammer
+rsync -avz --no-o --no-g -e "ssh -p 11074" ./data/ root@118.145.32.133:/mnt/afs/250010074/robot_manipulation/RoboTwin_IL_RL/data

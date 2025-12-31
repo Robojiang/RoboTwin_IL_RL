@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# bash train.sh beat_block_hammer demo_3d_vision_easy 100 0 0 
 task_name=${1}
 task_config=${2}
 expert_data_num=${3}
