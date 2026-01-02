@@ -146,7 +146,11 @@ class TrainDP3Workspace:
 
         env_runner = None
 
-        cfg.logging.name = str(cfg.task.name)
+        # 加上 exp_name (通常包含 debug 或其他标识) 和当前时间
+       
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        # 如果 train_rgb.sh 里设置了 exp_name="rgb"，这里就能区分开了
+        cfg.logging.name = f"{cfg.task.name}_{cfg.exp_name}_{timestamp}"
         cprint("-----------------------------", "yellow")
         cprint(f"[WandB] group: {cfg.logging.group}", "yellow")
         cprint(f"[WandB] name: {cfg.logging.name}", "yellow")

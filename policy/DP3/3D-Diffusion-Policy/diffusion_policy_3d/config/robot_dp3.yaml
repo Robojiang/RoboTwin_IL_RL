@@ -119,7 +119,7 @@ logging:
   mode: online
   name: ${exp_name}
   project: RoboTwin
-  resume: true
+  resume: False
   tags:
   - RoboTwin
 
