@@ -7,6 +7,14 @@ import importlib
 from pathlib import Path
 import time
 import cv2
+import transforms3d as t3d
+import sapien.core as sapien
+try:
+    import open3d as o3d
+    HAS_OPEN3D = True
+except ImportError:
+    HAS_OPEN3D = False
+    print("Open3D not found. 3D visualization will be disabled.")
 
 # Add paths
 current_file_path = os.path.abspath(__file__)
@@ -16,6 +24,39 @@ sys.path.append(os.path.join(parent_directory, "description/utils"))
 
 from envs import CONFIGS_PATH
 from envs.utils.create_actor import UnStableError
+
+# Global Visualizer
+vis_o3d = None
+pcd_o3d = None
+first_frame = True
+laser_actors = {}
+
+def update_sapien_lasers(env):
+    global laser_actors
+    
+    # Create actors if not exist
+    if not laser_actors:
+        try:
+            for arm in ['left', 'right']:
+                builder = env.scene.create_actor_builder()
+                # Box representing laser: length 0.3, thin. 
+                # Centered at x=0.15 so it starts at 0.
+                builder.add_box_visual(pose=sapien.Pose([0.15, 0, 0]), half_size=[0.15, 0.002, 0.002], material=[1, 0, 0])
+                actor = builder.build_kinematic(name=f"laser_{arm}")
+                laser_actors[arm] = actor
+        except Exception as e:
+            print(f"Error creating Sapien laser actors: {e}")
+
+    # Update poses
+    try:
+        for arm in ['left', 'right']:
+            if arm in laser_actors:
+                # Get pose [x, y, z, qw, qx, qy, qz]
+                pose_list = env.get_arm_pose(arm) 
+                pose = sapien.Pose(pose_list[:3], pose_list[3:])
+                laser_actors[arm].set_pose(pose)
+    except Exception as e:
+        print(f"Error updating Sapien laser pose: {e}")
 
 def class_decorator(task_name):
     envs_module = importlib.import_module(f"envs.{task_name}")
@@ -41,8 +82,35 @@ def display_observation(obs):
         else:
             print(f"{key}: {value}")
 
+def render_view(x, y, colors, img_size, label):
+    img = np.full((img_size, img_size, 3), 50, dtype=np.uint8)
+    scale = img_size / 1.5 # Zoom out a bit to fit more
+    offset = img_size / 2
+    
+    u = (x * scale + offset).astype(int)
+    v = (y * scale + offset).astype(int)
+    v = img_size - v # Flip Y for image coords
+    
+    valid = (u >= 0) & (u < img_size) & (v >= 0) & (v < img_size)
+    u = u[valid]
+    v = v[valid]
+    c = (colors[valid] * 255).astype(np.uint8)
+    
+    # Draw points
+    for j in range(len(u)):
+        # BGR color for OpenCV
+        cv2.circle(img, (u[j], v[j]), 2, (int(c[j][2]), int(c[j][1]), int(c[j][0])), -1)
+        
+    cv2.putText(img, label, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    return img
+
 def show_observation_images(env, obs=None):
     """Show observation images using cv2."""
+    global vis_o3d, pcd_o3d, first_frame
+    
+    # Update Sapien Visualization
+    update_sapien_lasers(env)
+    
     # RGB
     if env.data_type.get("rgb", False):
         rgb_dict = env.cameras.get_rgb()
@@ -98,17 +166,55 @@ def show_observation_images(env, obs=None):
         except Exception as e:
             print(f"Error getting point cloud: {e}")
 
+    # Add Laser Visualization (Red Cylinder)
+    try:
+        laser_points_list = []
+        poses = []
+        # Get poses from obs or env
+        if obs is not None and 'endpose' in obs:
+            if 'left_endpose' in obs['endpose']:
+                poses.append(obs['endpose']['left_endpose'])
+            if 'right_endpose' in obs['endpose']:
+                poses.append(obs['endpose']['right_endpose'])
+        else:
+            # Fallback
+            try:
+                poses.append(env.get_arm_pose("left"))
+                poses.append(env.get_arm_pose("right"))
+            except:
+                pass
+        
+        for pose in poses:
+            if pose is None: continue
+            # pose: [x, y, z, qw, qx, qy, qz]
+            pos = np.array(pose[:3])
+            quat = pose[3:]
+            mat = t3d.quaternions.quat2mat(quat)
+            direction = mat[:, 0] # X-axis
+            
+            # 50 points, length 0.3
+            dists = np.linspace(0, 0.3, 50)
+            pts = pos + direction * dists[:, None]
+            
+            # Color: Red [1, 0, 0]
+            cols = np.tile([1.0, 0.0, 0.0], (50, 1))
+            
+            laser = np.hstack([pts, cols])
+            laser_points_list.append(laser)
+            
+        if laser_points_list:
+            all_laser = np.vstack(laser_points_list)
+            if pcd is not None and len(pcd) > 0:
+                pcd = np.vstack([pcd, all_laser])
+            else:
+                pcd = all_laser
+                
+    except Exception as e:
+        print(f"Error generating laser: {e}")
+
     if pcd is not None and len(pcd) > 0:
         try:
             # Get point cloud (N, 6) -> XYZRGB
-            # Create a blank image for BEV (Bird's Eye View) - XY plane
-            img_size = 500
-            bev_img = np.full((img_size, img_size, 3), 50, dtype=np.uint8) # Gray background
-            
-            # Normalize XY to image coordinates
-            scale = img_size / 1.0 # 1 meter = 500 pixels
-            offset = img_size / 2
-            
             x = pcd[:, 0]
             y = pcd[:, 1]
             z = pcd[:, 2]
@@ -118,31 +224,70 @@ def show_observation_images(env, obs=None):
             mask = (z > -0.5) & (z < 2.0)
             x = x[mask]
             y = y[mask]
+            z = z[mask]
             colors = colors[mask]
             
-            u = (x * scale + offset).astype(int)
-            v = (y * scale + offset).astype(int) 
-            v = img_size - v # Flip Y
+            # 3D Visualization with Open3D
+            if HAS_OPEN3D:
+                if vis_o3d is None:
+                    vis_o3d = o3d.visualization.Visualizer()
+                    vis_o3d.create_window(window_name="3D Point Cloud", width=800, height=600)
+                    pcd_o3d = o3d.geometry.PointCloud()
+                    # Add dummy
+                    pcd_o3d.points = o3d.utility.Vector3dVector(np.array([[0,0,0]]))
+                    vis_o3d.add_geometry(pcd_o3d)
+                    
+                    ctr = vis_o3d.get_view_control()
+                    ctr.set_front([0, -1, -1])
+                    ctr.set_lookat([0, 0, 0])
+                    ctr.set_up([0, 0, 1])
+                    ctr.set_zoom(0.8)
+                
+                # Update Geometry
+                points_o3d = pcd[mask, :3]
+                colors_o3d = pcd[mask, 3:6]
+                
+                vis_o3d.clear_geometries()
+                pcd_o3d = o3d.geometry.PointCloud()
+                pcd_o3d.points = o3d.utility.Vector3dVector(points_o3d)
+                pcd_o3d.colors = o3d.utility.Vector3dVector(colors_o3d)
+                
+                vis_o3d.add_geometry(pcd_o3d, reset_bounding_box=first_frame)
+                
+                opt = vis_o3d.get_render_option()
+                opt.point_size = 3.0
+                opt.background_color = np.asarray([0.1, 0.1, 0.1])
+                
+                vis_o3d.poll_events()
+                vis_o3d.update_renderer()
+                
+                if first_frame:
+                    first_frame = False
+
+            # 2D 3-View Visualization
+            img_size = 400
             
-            # Clip to image bounds
-            valid = (u >= 0) & (u < img_size) & (v >= 0) & (v < img_size)
-            u = u[valid]
-            v = v[valid]
-            colors = (colors[valid] * 255).astype(np.uint8)
+            # 1. Top View (XY)
+            img_xy = render_view(x, y, colors, img_size, "Top View (XY)")
             
-            # Draw larger points
-            for i in range(len(u)):
-                cv2.circle(bev_img, (u[i], v[i]), 2, (int(colors[i][2]), int(colors[i][1]), int(colors[i][0])), -1)
+            # 2. Front View (XZ) - Z is up
+            img_xz = render_view(x, z - 0.5, colors, img_size, "Front View (XZ)") 
             
-            cv2.imshow("Point Cloud BEV (XY Plane)", bev_img)
+            # 3. Side View (YZ)
+            img_yz = render_view(y, z - 0.5, colors, img_size, "Side View (YZ)")
+            
+            # Combine
+            combined_pc = np.hstack([img_xy, img_xz, img_yz])
+            
+            cv2.imshow("3-View Point Cloud", combined_pc)
         except Exception as e:
             print(f"Error visualizing point cloud: {e}")
     else:
         # Create a black image with text if no PCD
-        img_size = 500
-        bev_img = np.zeros((img_size, img_size, 3), dtype=np.uint8)
-        cv2.putText(bev_img, "No Point Cloud Data", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.imshow("Point Cloud BEV (XY Plane)", bev_img)
+        img_size = 400
+        bev_img = np.zeros((img_size, img_size*3, 3), dtype=np.uint8)
+        cv2.putText(bev_img, "No Point Cloud Data", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.imshow("3-View Point Cloud", bev_img)
 
     cv2.waitKey(1)
 
@@ -240,6 +385,8 @@ def main():
     if args_cli.show_obs:
         print("Press Enter to close visualization windows...")
         input()
+        if vis_o3d:
+            vis_o3d.destroy_window()
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
