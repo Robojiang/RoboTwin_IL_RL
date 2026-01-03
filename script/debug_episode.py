@@ -6,7 +6,8 @@ import yaml
 import numpy as np
 import importlib
 from pathlib import Path
-from collections import deque
+import time
+import cv2
 
 # Add paths
 current_file_path = os.path.abspath(__file__)
@@ -41,6 +42,111 @@ def get_camera_config(camera_type):
     assert camera_type in args, f"camera {camera_type} is not defined"
     return args[camera_type]
 
+def show_observation_images(env, obs=None):
+    """Show observation images using cv2."""
+    # RGB
+    if env.data_type.get("rgb", False):
+        rgb_dict = env.cameras.get_rgb()
+        images = []
+        for cam_name, cam_data in rgb_dict.items():
+            if isinstance(cam_data, dict) and 'rgb' in cam_data:
+                img = cam_data['rgb']
+                bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                # Add label
+                cv2.putText(bgr, cam_name, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                images.append(bgr)
+        
+        if images:
+            # Tile images
+            n = len(images)
+            cols = int(np.ceil(np.sqrt(n)))
+            rows = int(np.ceil(n / cols))
+            h, w, c = images[0].shape
+            
+            # Create canvas
+            canvas = np.zeros((rows * h, cols * w, 3), dtype=np.uint8)
+            for i, img in enumerate(images):
+                r = i // cols
+                c = i % cols
+                canvas[r*h:(r+1)*h, c*w:(c+1)*w] = img
+            
+            # Resize if too big
+            if canvas.shape[0] > 1000 or canvas.shape[1] > 1800:
+                scale = min(1000/canvas.shape[0], 1800/canvas.shape[1])
+                canvas = cv2.resize(canvas, (0, 0), fx=scale, fy=scale)
+                
+            cv2.imshow("RGB Observations", canvas)
+            
+    # Depth (Optional: normalize for visualization)
+    if env.data_type.get("depth", False):
+        depth_dict = env.cameras.get_depth()
+        for cam_name, cam_data in depth_dict.items():
+            if isinstance(cam_data, dict) and 'depth' in cam_data:
+                img = cam_data['depth']
+                # Normalize depth to 0-255 for visualization
+                depth_vis = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
+                depth_vis = np.uint8(depth_vis)
+                depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
+                cv2.imshow(f"Depth: {cam_name}", depth_vis)
+            
+    # Point Cloud (Project to 2D for visualization)
+    pcd = None
+    if obs is not None and 'pointcloud' in obs:
+        pcd = obs['pointcloud']
+    elif env.data_type.get("pointcloud", False):
+        try:
+            pcd = env.cameras.get_pcd(if_combine=True)
+        except Exception as e:
+            print(f"Error getting point cloud: {e}")
+
+    if pcd is not None and len(pcd) > 0:
+        try:
+            # Get point cloud (N, 6) -> XYZRGB
+            # Create a blank image for BEV (Bird's Eye View) - XY plane
+            img_size = 500
+            bev_img = np.full((img_size, img_size, 3), 50, dtype=np.uint8) # Gray background
+            
+            # Normalize XY to image coordinates
+            scale = img_size / 1.0 # 1 meter = 500 pixels
+            offset = img_size / 2
+            
+            x = pcd[:, 0]
+            y = pcd[:, 1]
+            z = pcd[:, 2]
+            colors = pcd[:, 3:6] # RGB 0-1
+            
+            # Filter points based on Z (height)
+            mask = (z > -0.5) & (z < 2.0)
+            x = x[mask]
+            y = y[mask]
+            colors = colors[mask]
+            
+            u = (x * scale + offset).astype(int)
+            v = (y * scale + offset).astype(int) 
+            v = img_size - v # Flip Y
+            
+            # Clip to image bounds
+            valid = (u >= 0) & (u < img_size) & (v >= 0) & (v < img_size)
+            u = u[valid]
+            v = v[valid]
+            colors = (colors[valid] * 255).astype(np.uint8)
+            
+            # Draw larger points
+            for i in range(len(u)):
+                cv2.circle(bev_img, (u[i], v[i]), 2, (int(colors[i][2]), int(colors[i][1]), int(colors[i][0])), -1)
+            
+            cv2.imshow("Point Cloud BEV (XY Plane)", bev_img)
+        except Exception as e:
+            print(f"Error visualizing point cloud: {e}")
+    else:
+        # Create a black image with text if no PCD
+        img_size = 500
+        bev_img = np.zeros((img_size, img_size, 3), dtype=np.uint8)
+        cv2.putText(bev_img, "No Point Cloud Data", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.imshow("Point Cloud BEV (XY Plane)", bev_img)
+
+    cv2.waitKey(1)
+
 def main():
     parser = argparse.ArgumentParser(description="Debug Episode Script")
     parser.add_argument("--task_name", type=str, default="beat_block_hammer", help="Name of the task")
@@ -51,6 +157,7 @@ def main():
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     parser.add_argument("--render_freq", type=int, default=20, help="Render frequency (set to >0 to visualize)")
     parser.add_argument("--gpu_id", type=int, default=0, help="GPU ID")
+    parser.add_argument("--show_obs", type=int, default=1, help="Show observation (1: True, 0: False)")
     
     args_cli = parser.parse_args()
     
@@ -119,6 +226,23 @@ def main():
     print(f"Initializing Task: {args_cli.task_name}")
     env = class_decorator(args_cli.task_name)
     
+    # Setup Demo / Reset Env
+    print(f"Setting up demo with seed {args_cli.seed}")
+    env.setup_demo(now_ep_num=0, seed=args_cli.seed, is_test=True, **task_args)
+    
+    # Monkey Patch for Visualization and Delay
+    # Must be done AFTER setup_demo because setup_demo re-initializes the viewer
+    if hasattr(env, 'viewer') and env.viewer:
+        original_render = env.viewer.render
+        def patched_render():
+            original_render()
+            # Update cameras to get fresh data for visualization
+            env.cameras.update_picture() # Ensure cameras capture the current frame
+            if args_cli.show_obs:
+                show_observation_images(env, env.now_obs) # Pass current obs if available
+            time.sleep(0.1) # Slow down rendering
+        env.viewer.render = patched_render
+    
     # Initialize Policy
     print(f"Initializing Policy: {args_cli.policy_name}")
     policy_module = importlib.import_module(f"{args_cli.policy_name}.deploy_policy")
@@ -130,10 +254,6 @@ def main():
         usr_args["expert_data_num"] = args_cli.expert_data_num
         
     model = get_model(usr_args)
-    
-    # Setup Demo / Reset Env
-    print(f"Setting up demo with seed {args_cli.seed}")
-    env.setup_demo(now_ep_num=0, seed=args_cli.seed, is_test=True, **task_args)
     
     # Set Dummy Instruction
     env.set_instruction("do the task")
@@ -182,6 +302,10 @@ def main():
             
     print("Episode Finished.")
     env.close_env()
+    if args_cli.show_obs:
+        print("Press Enter to close visualization windows...")
+        input()
+        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()

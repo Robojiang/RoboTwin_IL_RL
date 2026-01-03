@@ -11,8 +11,6 @@ eval_video/
 
 **/.DS_Store
 
-policy/SEM/RoboOrchardLab-master/projects/sem/robotwin/ckpt
-
 # eval result
 eval_result/
 
@@ -22,7 +20,7 @@ assets/*
 !assets/files
 
 policy/weights/*
-
+policy/VGC/data/*
 envs/curobo/*
 
 .vscode

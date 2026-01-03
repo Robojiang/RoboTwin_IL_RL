@@ -1,0 +1,188 @@
+import zarr
+import numpy as np
+import cv2
+import argparse
+import os
+import time
+try:
+    import open3d as o3d
+    HAS_OPEN3D = True
+except ImportError:
+    HAS_OPEN3D = False
+    print("Open3D not found. 3D visualization will be disabled.")
+
+def visualize_keyframes(zarr_path, episode_idx=0, show_3d=False):
+    print(f"Opening {zarr_path}...")
+    root = zarr.open(zarr_path, mode='r')
+    
+    # Load data
+    point_cloud = root['data/point_cloud']
+    keyframe_mask = root['data/keyframe_mask']
+    episode_ends = root['meta/episode_ends']
+    
+    has_images = 'data/images' in root
+    if has_images:
+        images_data = root['data/images']
+    
+    # Determine range for the requested episode
+    if episode_idx == 0:
+        start_idx = 0
+        end_idx = episode_ends[0]
+    else:
+        start_idx = episode_ends[episode_idx-1]
+        end_idx = episode_ends[episode_idx]
+        
+    print(f"Visualizing Episode {episode_idx} (Frames {start_idx} to {end_idx})")
+    
+    # Initialize Open3D Visualizer if requested
+    vis = None
+    pcd_o3d = None
+    if show_3d and HAS_OPEN3D:
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(window_name="3D Point Cloud", width=800, height=600)
+        pcd_o3d = o3d.geometry.PointCloud()
+        # Add a dummy point to initialize
+        pcd_o3d.points = o3d.utility.Vector3dVector(np.array([[0,0,0]]))
+        vis.add_geometry(pcd_o3d)
+        
+        # Set view control
+        ctr = vis.get_view_control()
+        ctr.set_front([0, -1, -1])
+        ctr.set_lookat([0, 0, 0])
+        ctr.set_up([0, 0, 1])
+        ctr.set_zoom(0.8)
+
+    def render_view(x, y, colors, img_size, label):
+        img = np.full((img_size, img_size, 3), 50, dtype=np.uint8)
+        scale = img_size / 1.5 # Zoom out a bit to fit more
+        offset = img_size / 2
+        
+        u = (x * scale + offset).astype(int)
+        v = (y * scale + offset).astype(int)
+        v = img_size - v # Flip Y for image coords
+        
+        valid = (u >= 0) & (u < img_size) & (v >= 0) & (v < img_size)
+        u = u[valid]
+        v = v[valid]
+        c = (colors[valid] * 255).astype(np.uint8)
+        
+        # Draw points
+        for j in range(len(u)):
+            # BGR color for OpenCV
+            cv2.circle(img, (u[j], v[j]), 2, (int(c[j][2]), int(c[j][1]), int(c[j][0])), -1)
+            
+        cv2.putText(img, label, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        return img
+
+    # Loop through frames
+    for i in range(start_idx, end_idx):
+        pcd = point_cloud[i]
+        is_keyframe = keyframe_mask[i]
+        
+        # Extract Point Cloud
+        x = pcd[:, 0]
+        y = pcd[:, 1]
+        z = pcd[:, 2]
+        colors = pcd[:, 3:6] 
+        
+        # Update Open3D
+        if vis:
+            # Filter for Open3D
+            mask_o3d = (z > -0.5) & (z < 2.0)
+            points_o3d = pcd[mask_o3d, :3]
+            colors_o3d = pcd[mask_o3d, 3:6]
+            
+            # Debug info for the first frame
+            if i == start_idx:
+                print(f"Frame {i} Point Cloud Stats:")
+                print(f"  Count: {len(points_o3d)}")
+                if len(points_o3d) > 0:
+                    print(f"  Min: {points_o3d.min(axis=0)}")
+                    print(f"  Max: {points_o3d.max(axis=0)}")
+            
+            vis.clear_geometries()
+            pcd_o3d = o3d.geometry.PointCloud()
+            pcd_o3d.points = o3d.utility.Vector3dVector(points_o3d)
+            pcd_o3d.colors = o3d.utility.Vector3dVector(colors_o3d)
+            
+            # Reset view only on the first frame to fit the point cloud
+            reset_bbox = (i == start_idx)
+            vis.add_geometry(pcd_o3d, reset_bounding_box=reset_bbox)
+            
+            # Render options
+            opt = vis.get_render_option()
+            opt.point_size = 3.0
+            opt.background_color = np.asarray([0.1, 0.1, 0.1]) # Dark gray
+            
+            vis.poll_events()
+            vis.update_renderer()
+        
+        # Filter for 2D views
+        mask = (z > -0.5) & (z < 2.0)
+        x = x[mask]
+        y = y[mask]
+        z = z[mask]
+        colors = colors[mask]
+        
+        img_size = 400
+        
+        # 1. Top View (XY)
+        img_xy = render_view(x, y, colors, img_size, "Top View (XY)")
+        
+        # 2. Front View (XZ) - Z is up
+        img_xz = render_view(x, z - 0.5, colors, img_size, "Front View (XZ)") # Shift Z to center roughly
+        
+        # 3. Side View (YZ)
+        img_yz = render_view(y, z - 0.5, colors, img_size, "Side View (YZ)")
+        
+        # Combine
+        combined_pc = np.hstack([img_xy, img_xz, img_yz])
+
+        # Show RGB Images
+        if has_images:
+            imgs = images_data[i] # (N, H, W, C)
+            # Tile
+            n = len(imgs)
+            cols = int(np.ceil(np.sqrt(n)))
+            rows = int(np.ceil(n / cols))
+            h, w, c = imgs[0].shape
+            
+            canvas = np.zeros((rows * h, cols * w, 3), dtype=np.uint8)
+            for k, img in enumerate(imgs):
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)  # 转换为 BGR
+                r = k // cols
+                c = k % cols
+                canvas[r*h:(r+1)*h, c*w:(c+1)*w] = img
+            
+            # Resize if too big
+            if canvas.shape[0] > 1000 or canvas.shape[1] > 1800:
+                scale = min(1000/canvas.shape[0], 1800/canvas.shape[1])
+                canvas = cv2.resize(canvas, (0, 0), fx=scale, fy=scale)
+                
+            cv2.imshow("RGB Images", canvas)
+
+        # Highlight Keyframe
+        if is_keyframe:
+            # Draw border on combined PC image
+            cv2.rectangle(combined_pc, (0, 0), (combined_pc.shape[1]-1, combined_pc.shape[0]-1), (0, 0, 255), 10)
+            cv2.putText(combined_pc, "KEYFRAME", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+            print(f"Frame {i}: KEYFRAME")
+            cv2.imshow("3-View Point Cloud", combined_pc)
+            cv2.waitKey(2000) # Pause for 1 second at keyframes
+        else:
+            cv2.imshow("3-View Point Cloud", combined_pc)
+            cv2.waitKey(30) # Play normal frames at ~30fps
+
+    if vis:
+        vis.destroy_window()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # stack_blocks_two-demo_3d_vision_easy-100-ppi.zarr beat_block_hammer-demo_3d_vision_easy-100-ppi.zarr
+    parser.add_argument("--zarr_path", type=str, default='policy/VGC/data/stack_blocks_two-demo_3d_vision_easy-100-ppi.zarr', help="Path to the processed Zarr file")
+    parser.add_argument("--episode", type=int, default=0, help="Episode index to visualize")
+    parser.add_argument("--show_3d", default=True, help="Enable 3D Open3D visualization")
+    args = parser.parse_args()
+    
+    visualize_keyframes(args.zarr_path, args.episode, args.show_3d)
