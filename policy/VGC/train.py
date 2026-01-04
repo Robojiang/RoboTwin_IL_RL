@@ -199,11 +199,15 @@ class TrainVGCWorkspace:
                 self.save_checkpoint()
                 # Save topk
                 if env_runner is not None:
-                    metric_value = step_log.get(cfg.checkpoint.topk.monitor_key, 0.0)
-                    topk_manager.save_checkpoint(
-                        checkpoint_path=self.get_checkpoint_path(tag=f"epoch={self.epoch:04d}-test_mean_score={metric_value:.3f}.ckpt"),
-                        score=metric_value
-                    )
+                    metric_key = cfg.checkpoint.topk.monitor_key
+                    metric_value = step_log.get(metric_key, 0.0)
+                    data = {
+                        'epoch': self.epoch,
+                        metric_key: metric_value
+                    }
+                    topk_path = topk_manager.get_ckpt_path(data)
+                    if topk_path is not None:
+                        self.save_checkpoint(path=pathlib.Path(topk_path))
 
             wandb.log(step_log, step=self.global_step)
             self.epoch += 1
