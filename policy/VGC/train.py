@@ -190,7 +190,8 @@ class TrainVGCWorkspace:
             if (self.epoch % cfg.training.val_every) == 0:
                 if env_runner is not None:
                     runner_log = env_runner.run(policy)
-                    step_log.update(runner_log)
+                    if runner_log is not None:
+                        step_log.update(runner_log)
             
             # Checkpoint
             if (self.epoch % cfg.training.checkpoint_every) == 0 and cfg.checkpoint.save_ckpt:

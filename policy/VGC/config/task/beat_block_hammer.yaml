@@ -19,7 +19,9 @@ shape_meta:
     point_cloud:
       shape: [1024, 6]
     images:
-      shape: [2, 3, 224, 224]
+      shape: [4, 3, 224, 224]
+    dino_features:
+      shape: [4, 196, 384]
 
 env_runner:
   _target_: diffusion_policy_3d.env_runner.robot_runner.RobotRunner
