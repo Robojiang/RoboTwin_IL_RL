@@ -78,7 +78,7 @@ logging:
   group: ${name}
   id: null
   mode: online
-  name: ${training.seed}
+  name: ${now:%H.%M.%S}_${name}_${task.name}
   project: vgc_policy
   resume: true
   tags:
@@ -98,9 +98,9 @@ hydra:
   job:
     override_dirname: ${name}
   run:
-    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task.name}
+    dir: data/outputs/${now:%H.%M.%S}_${name}_${task.name}
   sweep:
-    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task.name}
+    dir: data/outputs/${now:%H.%M.%S}_${name}_${task.name}
     subdir: ${hydra.job.num}
 
 
