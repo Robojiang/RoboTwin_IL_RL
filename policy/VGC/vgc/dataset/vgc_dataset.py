@@ -69,10 +69,26 @@ class VGCDataset(BaseDataset):
             
         print(f"Loading dataset from: {zarr_path}")
         
+        # Check available keys in Zarr
+        with zarr.open(zarr_path, 'r') as root:
+            available_keys = list(root['data'].keys())
+            
+        keys_to_load = ["state", "action", "point_cloud", "left_endpose", "right_endpose", "keyframe_mask"]
+        
+        # Prefer dino_features if available, otherwise load images
+        if "dino_features" in available_keys:
+            print("Found pre-computed DINO features. Loading them instead of images.")
+            keys_to_load.append("dino_features")
+            self.use_dino_features = True
+        else:
+            print("No pre-computed DINO features found. Loading images.")
+            keys_to_load.append("images")
+            self.use_dino_features = False
+        
         # Load ReplayBuffer with all necessary keys
         self.replay_buffer = ReplayBuffer.copy_from_path(
             zarr_path, 
-            keys=["state", "action", "point_cloud", "images", "left_endpose", "right_endpose", "keyframe_mask"]
+            keys=keys_to_load
         )
         
         # === Pre-calculate Next Keypose ===
@@ -205,21 +221,32 @@ class VGCDataset(BaseDataset):
         
         agent_pos = sample["state"].astype(np.float32)
         point_cloud = sample["point_cloud"].astype(np.float32)
-        images = sample["images"] # (T, N_cams, H, W, C)
         
-        # Resize images to 224x224 and normalize
-        T, N_cams, H, W, C = images.shape
-        resized_images = np.zeros((T, N_cams, 224, 224, C), dtype=np.float32)
+        obs_data = {
+            "point_cloud": point_cloud,  # T, N, 6
+        }
         
-        for t in range(T):
-            for n in range(N_cams):
-                resized_images[t, n] = cv2.resize(images[t, n], (224, 224)).astype(np.float32) / 255.0
-        
-        images = resized_images
+        if self.use_dino_features:
+            # (T, K, N_patches, D_feat)
+            dino_features = sample["dino_features"].astype(np.float32)
+            obs_data["dino_features"] = dino_features
+        else:
+            images = sample["images"] # (T, N_cams, H, W, C)
             
-        # Rearrange images to (T, N_cams, C, H, W) for PyTorch
-        # Input is (T, N_cams, H, W, C) -> Output (T, N_cams, C, H, W)
-        images = np.moveaxis(images, -1, 2) 
+            # Resize images to 224x224 and normalize
+            T, N_cams, H, W, C = images.shape
+            resized_images = np.zeros((T, N_cams, 224, 224, C), dtype=np.float32)
+            
+            for t in range(T):
+                for n in range(N_cams):
+                    resized_images[t, n] = cv2.resize(images[t, n], (224, 224)).astype(np.float32) / 255.0
+            
+            images = resized_images
+                
+            # Rearrange images to (T, N_cams, C, H, W) for PyTorch
+            # Input is (T, N_cams, H, W, C) -> Output (T, N_cams, C, H, W)
+            images = np.moveaxis(images, -1, 2) 
+            obs_data["images"] = images
         
         left_endpose = sample["left_endpose"].astype(np.float32)
         right_endpose = sample["right_endpose"].astype(np.float32)
@@ -245,13 +272,11 @@ class VGCDataset(BaseDataset):
         # Since we predict keypose for the current observation, we can just take the whole sequence
         # or just the first one. The model architecture usually predicts one keypose per timestep.
         keypose = sample["target_keypose"].astype(np.float32)
+        
+        obs_data["agent_pos"] = agent_pos
 
         data = {
-            "obs": {
-                "point_cloud": point_cloud,  # T, N, 6
-                "agent_pos": agent_pos,      # T, D_pos
-                "images": images,            # T, K, C, H, W
-            },
+            "obs": obs_data,
             "target_keypose": keypose,       # T, D_keypose
             "action": sample["action"].astype(np.float32),  # T, D_action
         }

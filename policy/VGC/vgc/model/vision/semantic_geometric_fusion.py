@@ -78,25 +78,34 @@ class SemanticGeometricFusion(nn.Module):
         # Standard ImageNet normalization for DINO
         self.normalize = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    def forward(self, point_features, images):
+    def forward(self, point_features, images=None, precomputed_features=None):
         """
         Args:
             point_features: (B, N, D_point) - Geometry features from PointNet.
             images: (B, K, C, H, W) - Multi-view images. K is number of cameras.
                     Images should be in range [0, 1].
+            precomputed_features: (B, K, N_patches, D_dino) - Pre-computed DINO features.
         Returns:
             fused_features: (B, N, D_point) - Point features enriched with semantic info.
         """
         B, N, D_point = point_features.shape
-        B, K, C, H, W = images.shape
         
         # --- Step 1: Vision (Frozen DINO) ---
-        images_flat = rearrange(images, 'b k c h w -> (b k) c h w')
-        images_flat = self.normalize(images_flat)
+        if precomputed_features is not None:
+            # Use pre-computed features
+            # Shape: (B, K, N_patches, D_dino)
+            # We need to flatten K and N_patches
+            B, K, N_patches, D_dino = precomputed_features.shape
+            patch_features = rearrange(precomputed_features, 'b k n d -> (b k) n d')
+        else:
+            assert images is not None, "Either images or precomputed_features must be provided"
+            B, K, C, H, W = images.shape
+            images_flat = rearrange(images, 'b k c h w -> (b k) c h w')
+            images_flat = self.normalize(images_flat)
 
-        with torch.no_grad():
-            features_dict = self.visual_encoder.forward_features(images_flat)
-            patch_features = features_dict['x_norm_patchtokens']
+            with torch.no_grad():
+                features_dict = self.visual_encoder.forward_features(images_flat)
+                patch_features = features_dict['x_norm_patchtokens']
             
         visual_tokens = rearrange(patch_features, '(b k) n d -> b (k n) d', b=B, k=K)
         visual_tokens = self.visual_proj(visual_tokens)

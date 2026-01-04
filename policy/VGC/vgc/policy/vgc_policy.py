@@ -128,20 +128,25 @@ class VGCPolicy(BasePolicy):
         ntarget_keypose = self.normalizer['target_keypose'].normalize(batch['target_keypose'])
         
         point_cloud = nobs['point_cloud'] # (B, T, N, 6)
-        images = batch['obs']['images']   # (B, T, K, C, H, W)
         agent_pos = nobs['agent_pos']     # (B, T, D_pos)
         
         # Flatten time dimension for encoding
         B, T, N, _ = point_cloud.shape
         point_cloud_flat = rearrange(point_cloud, 'b t n c -> (b t) n c')
-        images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
         agent_pos_flat = rearrange(agent_pos, 'b t d -> (b t) d')
         
         # PointNet
         point_features = self.pointnet(point_cloud_flat) # ((B*T), N, D_point)
         
         # Fusion
-        fused_features = self.fusion(point_features, images_flat) # ((B*T), N, D_point)
+        if 'dino_features' in batch['obs']:
+            dino_features = batch['obs']['dino_features'] # (B, T, K, N_patches, D_feat)
+            dino_features_flat = rearrange(dino_features, 'b t k n d -> (b t) k n d')
+            fused_features = self.fusion(point_features, precomputed_features=dino_features_flat)
+        else:
+            images = batch['obs']['images']   # (B, T, K, C, H, W)
+            images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
+            fused_features = self.fusion(point_features, images=images_flat) # ((B*T), N, D_point)
         
         # Global Pooling (Max)
         global_fused = torch.max(fused_features, dim=1)[0] # ((B*T), D_point)
@@ -201,21 +206,26 @@ class VGCPolicy(BasePolicy):
                 nobs[key] = value
         
         point_cloud = nobs['point_cloud']
-        images = batch['obs']['images']
         agent_pos = nobs['agent_pos']
         
         B, T, N, _ = point_cloud.shape
         
         # Flatten time dimension for encoding
         point_cloud_flat = rearrange(point_cloud, 'b t n c -> (b t) n c')
-        images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
         agent_pos_flat = rearrange(agent_pos, 'b t d -> (b t) d')
         
         # PointNet
         point_features = self.pointnet(point_cloud_flat)
         
         # Fusion
-        fused_features = self.fusion(point_features, images_flat)
+        if 'dino_features' in batch['obs']:
+            dino_features = batch['obs']['dino_features']
+            dino_features_flat = rearrange(dino_features, 'b t k n d -> (b t) k n d')
+            fused_features = self.fusion(point_features, precomputed_features=dino_features_flat)
+        else:
+            images = batch['obs']['images']
+            images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
+            fused_features = self.fusion(point_features, images=images_flat)
         
         # Global Pooling
         global_fused = torch.max(fused_features, dim=1)[0]
