@@ -4,8 +4,8 @@ dataset:
   _target_: vgc.dataset.vgc_dataset.VGCDataset
   zarr_path: data/beat_block_hammer-demo_3d_vision_easy-100-ppi.zarr
   horizon: ${policy.horizon}
-  pad_before: 1
-  pad_after: 7
+  pad_before: ${eval:'${policy.n_obs_steps}-1'}
+  pad_after: ${eval:'${policy.n_action_steps}-1'}
   seed: 42
   val_ratio: 0.02
   max_train_episodes: null
