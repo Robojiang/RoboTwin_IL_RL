@@ -36,9 +36,14 @@ class SemanticGeometricFusion(nn.Module):
             local_model_path = os.path.join(workspace_root, "assets", f"{dino_model_name}.pth")
             
             if os.path.exists(local_model_path):
-                print(f"Found local model file at {local_model_path}. Loading directly...")
+                model_path = local_model_path
+            else:
+                model_path = None
+
+            if model_path:
+                print(f"Found local model file at {model_path}. Loading directly...")
                 self.visual_encoder = torch.hub.load('facebookresearch/dinov2', dino_model_name, source='github', pretrained=False)
-                state_dict = torch.load(local_model_path, map_location="cpu")
+                state_dict = torch.load(model_path, map_location="cpu")
                 self.visual_encoder.load_state_dict(state_dict)
                 print("Local weights loaded successfully.")
             else:

@@ -65,8 +65,11 @@ def encode_obs(observation):  # Post-Process Observation
         # Decode if necessary (RoboTwin usually returns raw bytes or numpy array)
         # Assuming numpy array (H, W, C) or bytes
         img_data = observation['observation'][cam_name]['rgb']
+
         if isinstance(img_data, bytes):
              img = cv2.imdecode(np.frombuffer(img_data, np.uint8), cv2.IMREAD_COLOR)
+             # cv2.imdecode returns BGR, but DINOv2 expects RGB
+             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         else:
              img = img_data
              
@@ -95,7 +98,12 @@ def get_model(usr_args):
     # Note: We are inside policy/VGC/
     with initialize(config_path=config_path, version_base='1.2'):
         # Compose config, overriding task
-        cfg = compose(config_name=config_name, overrides=[f"task={usr_args['task_name']}"])
+        # FORCE use_pc_features=False for inference to ensure DINO is loaded
+        overrides = [
+            f"task={usr_args['task_name']}",
+            "policy.use_pc_features=False"
+        ]
+        cfg = compose(config_name=config_name, overrides=overrides)
         
     # Instantiate Model
     model = hydra.utils.instantiate(cfg.policy)
@@ -114,29 +122,38 @@ def get_model(usr_args):
     
     # Find latest directory matching task name
     if os.path.exists(base_output_dir):
-        # List all date directories
-        dates = sorted([d for d in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, d))], reverse=True)
-        for date in dates:
-            date_dir = os.path.join(base_output_dir, date)
-            # List all run directories
-            runs = sorted([r for r in os.listdir(date_dir) if usr_args['task_name'] in r], reverse=True)
-            if runs:
-                # Found latest run
-                latest_run = runs[0]
-                ckpt_dir = os.path.join(date_dir, latest_run, "checkpoints")
-                if os.path.exists(ckpt_dir):
-                    # Find best or latest ckpt
-                    ckpts = [f for f in os.listdir(ckpt_dir) if f.endswith('.ckpt') or f.endswith('.pth')]
-                    if ckpts:
-                        # Prefer 'latest.ckpt' or 'best.ckpt' or just the last one
-                        if 'latest.ckpt' in ckpts:
-                            ckpt_path = os.path.join(ckpt_dir, 'latest.ckpt')
-                        elif 'best.ckpt' in ckpts:
-                            ckpt_path = os.path.join(ckpt_dir, 'best.ckpt')
-                        else:
-                            ckpt_path = os.path.join(ckpt_dir, sorted(ckpts)[-1])
-                        break
-            if ckpt_path: break
+        # Try to find run directories directly in base_output_dir (Flat structure)
+        runs = sorted([r for r in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, r)) and usr_args['task_name'] in r], reverse=True)
+        
+        ckpt_dir = None
+        if runs:
+            # Found in flat structure
+            latest_run = runs[0]
+            ckpt_dir = os.path.join(base_output_dir, latest_run, "checkpoints")
+        else:
+            # Try nested structure (outputs/DATE/RUN_DIR)
+            dates = sorted([d for d in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, d))], reverse=True)
+            for date in dates:
+                date_dir = os.path.join(base_output_dir, date)
+                # List all run directories
+                runs = sorted([r for r in os.listdir(date_dir) if usr_args['task_name'] in r], reverse=True)
+                if runs:
+                    # Found latest run
+                    latest_run = runs[0]
+                    ckpt_dir = os.path.join(date_dir, latest_run, "checkpoints")
+                    break
+        
+        if ckpt_dir and os.path.exists(ckpt_dir):
+            # Find best or latest ckpt
+            ckpts = [f for f in os.listdir(ckpt_dir) if f.endswith('.ckpt') or f.endswith('.pth')]
+            if ckpts:
+                # Prefer 'latest.ckpt' or 'best.ckpt' or just the last one
+                if 'latest.ckpt' in ckpts:
+                    ckpt_path = os.path.join(ckpt_dir, 'latest.ckpt')
+                elif 'best.ckpt' in ckpts:
+                    ckpt_path = os.path.join(ckpt_dir, 'best.ckpt')
+                else:
+                    ckpt_path = os.path.join(ckpt_dir, sorted(ckpts)[-1])
             
     if ckpt_path is None:
         print(f"Warning: No checkpoint found for task {usr_args['task_name']}. Using random weights.")
@@ -170,16 +187,37 @@ class VGCWrapper:
         # Handle different saving formats
         if 'state_dicts' in payload:
             state_dict = payload['state_dicts']['model']
-            # Also load normalizer!
-            # The normalizer state is usually inside the model state_dict if it's a module
-            # In our train.py, model.set_normalizer() copies state to model.normalizer
-            # So loading model state_dict should be enough IF normalizer is a submodule
         elif 'state_dict' in payload:
             state_dict = payload['state_dict']
         else:
             state_dict = payload # Raw state dict
             
-        self.model.load_state_dict(state_dict)
+        # Filter out DINO weights if they are missing in the checkpoint but present in the model
+        # This happens when we train with precomputed features (DINO not in model) 
+        # but infer with images (DINO in model)
+        model_state_dict = self.model.state_dict()
+        
+        # Keys present in model but missing in checkpoint
+        missing_keys = set(model_state_dict.keys()) - set(state_dict.keys())
+        
+        # If missing keys are related to visual_encoder (DINO), it's expected
+        # because we initialized DINO from pretrained weights in __init__
+        # So we should just ignore them during load_state_dict
+        
+        # We can use strict=False, but that might hide other errors.
+        # Better approach: Check if missing keys are indeed DINO keys
+        
+        dino_keys = [k for k in missing_keys if "visual_encoder" in k]
+        other_missing_keys = [k for k in missing_keys if "visual_encoder" not in k]
+        
+        if len(other_missing_keys) > 0:
+            print(f"Warning: Missing non-DINO keys in checkpoint: {other_missing_keys}")
+            
+        if len(dino_keys) > 0:
+            print(f"Note: {len(dino_keys)} DINOv2 keys are missing in checkpoint (expected since training used precomputed features). Keeping pretrained weights.")
+            
+        # Load with strict=False to allow missing DINO keys
+        self.model.load_state_dict(state_dict, strict=False)
         print("Model weights loaded successfully.")
 
     def update_obs(self, obs):
