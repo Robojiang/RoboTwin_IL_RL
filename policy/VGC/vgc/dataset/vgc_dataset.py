@@ -72,8 +72,72 @@ class VGCDataset(BaseDataset):
         # Load ReplayBuffer with all necessary keys
         self.replay_buffer = ReplayBuffer.copy_from_path(
             zarr_path, 
-            keys=["state", "action", "point_cloud", "images", "left_endpose", "right_endpose"]
+            keys=["state", "action", "point_cloud", "images", "left_endpose", "right_endpose", "keyframe_mask"]
         )
+        
+        # === Pre-calculate Next Keypose ===
+        print("Pre-calculating next keyposes...")
+        
+        # Convert Endpose to 9D (Pos + Rot6D)
+        left_endpose = self.replay_buffer["left_endpose"]
+        right_endpose = self.replay_buffer["right_endpose"]
+        
+        # Left
+        l_pos = left_endpose[..., :3]
+        l_rot = quat_to_rot6d(left_endpose[..., 3:])
+        l_9d = np.concatenate([l_pos, l_rot], axis=-1)
+        
+        # Right
+        r_pos = right_endpose[..., :3]
+        r_rot = quat_to_rot6d(right_endpose[..., 3:])
+        r_9d = np.concatenate([r_pos, r_rot], axis=-1)
+        
+        # Combine to 18D Pose
+        all_endposes = np.concatenate([l_9d, r_9d], axis=-1) # (Total_Steps, 18)
+        
+        # Create array to store calculated Target Keypose
+        target_keyposes = np.zeros_like(all_endposes)
+        
+        # Iterate over each Episode
+        for i in range(self.replay_buffer.n_episodes):
+            # Get slice range for this Episode
+            start = self.replay_buffer.episode_ends[i-1] if i > 0 else 0
+            end = self.replay_buffer.episode_ends[i]
+            
+            mask = self.replay_buffer["keyframe_mask"][start:end] # (T,)
+            ep_poses = all_endposes[start:end] # (T, 18)
+            
+            # Find keyframe indices (relative to episode start)
+            kf_indices = np.where(mask > 0)[0]
+            
+            # Logic:
+            # If first frame (0) is a keyframe, we ignore it as a target for itself.
+            # We want to predict the NEXT keyframe.
+            # If there are no keyframes, fallback to last frame.
+            
+            if len(kf_indices) == 0:
+                kf_indices = np.array([len(mask) - 1])
+            elif kf_indices[-1] != (len(mask) - 1):
+                # Ensure last frame is always a candidate target
+                kf_indices = np.append(kf_indices, len(mask) - 1)
+            
+            # Find next keyframe index for each frame
+            indices = np.arange(len(mask))
+            
+            # searchsorted finds insertion points to maintain order.
+            # side='right' means for value x, we find index i such that a[i-1] <= x < a[i]
+            # This effectively finds the strictly greater keyframe index.
+            next_kf_pos = np.searchsorted(kf_indices, indices, side='right')
+            
+            # Clip to valid range
+            next_kf_pos = np.clip(next_kf_pos, 0, len(kf_indices) - 1)
+            target_indices = kf_indices[next_kf_pos]
+            
+            # Assign
+            target_keyposes[start:end] = ep_poses[target_indices]
+            
+        # Store back to ReplayBuffer
+        self.replay_buffer.data["target_keypose"] = target_keyposes
         
         val_mask = get_val_mask(n_episodes=self.replay_buffer.n_episodes, val_ratio=val_ratio, seed=seed)
         train_mask = ~val_mask
@@ -127,8 +191,7 @@ class VGCDataset(BaseDataset):
             "action": self.replay_buffer["action"],
             "agent_pos": agent_pos,
             "point_cloud": self.replay_buffer["point_cloud"],
-            "left_endpose": left_endpose_9d, # Used for keypose normalization in policy
-            "right_endpose": right_endpose_9d,
+            "target_keypose": self.replay_buffer["target_keypose"], # Use pre-calculated targets
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
@@ -176,8 +239,12 @@ class VGCDataset(BaseDataset):
         # agent_pos = sample["state"] (14) + left (9) + right (9) = 32
         agent_pos = np.concatenate([agent_pos, left_endpose_9d, right_endpose_9d], axis=-1)
         
-        # Combine endposes into a single keypose target (18 dims)
-        keypose = np.concatenate([left_endpose_9d, right_endpose_9d], axis=-1)
+        # Use pre-calculated target_keypose from ReplayBuffer
+        # sample["target_keypose"] is (Horizon, 18)
+        # We take the target corresponding to the current step (or the whole sequence if needed)
+        # Since we predict keypose for the current observation, we can just take the whole sequence
+        # or just the first one. The model architecture usually predicts one keypose per timestep.
+        keypose = sample["target_keypose"].astype(np.float32)
 
         data = {
             "obs": {

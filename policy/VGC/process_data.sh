@@ -1,6 +1,6 @@
 #!/bin/bash
-
-task_name=stack_blocks_two
+# beat_block_hammer stack_blocks_two
+task_name=beat_block_hammer
 task_config=demo_3d_vision_easy
 expert_data_num=100
 

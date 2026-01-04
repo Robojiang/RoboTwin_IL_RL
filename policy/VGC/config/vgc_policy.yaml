@@ -27,18 +27,46 @@ policy:
   d_point: 128
   dino_model_name: 'dinov2_vits14'
 
+ema:
+  _target_: diffusion_policy_3d.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+dataloader:
+  batch_size: 4
+  num_workers: 8
+  shuffle: True
+  pin_memory: True
+  persistent_workers: False
+
+val_dataloader:
+  batch_size: 4
+  num_workers: 8
+  shuffle: False
+  pin_memory: True
+  persistent_workers: False
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
 training:
   device: "cuda:0"
   seed: 42
-  debug: False
+  debug: True
   resume: True
-  lr: 1e-4
-  weight_decay: 1e-6
   lr_scheduler: "cosine"
   lr_warmup_steps: 500
   num_epochs: 100
   gradient_accumulate_every: 1
   use_ema: True
+  rollout_every: 50
   checkpoint_every: 10
   val_every: 10
   sample_every: 10
@@ -46,23 +74,34 @@ training:
   max_val_steps: null
   tqdm_interval_sec: 1.0
 
-dataloader:
-  batch_size: 4
-  num_workers: 4
-  shuffle: True
-  pin_memory: True
-  persistent_workers: False
+logging:
+  group: ${name}
+  id: null
+  mode: online
+  name: ${training.seed}
+  project: vgc_policy
+  resume: true
+  tags:
+  - vgc
 
-val_dataloader:
-  batch_size: 4
-  num_workers: 4
-  shuffle: False
-  pin_memory: True
-  persistent_workers: False
+checkpoint:
+  save_ckpt: True
+  topk:
+    monitor_key: test_mean_score
+    mode: max
+    k: 1
+    format_str: 'epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
 
-optimizer:
-  _target_: torch.optim.AdamW
-  lr: ${training.lr}
-  weight_decay: ${training.weight_decay}
-  betas: [0.95, 0.999]
-  eps: 1.0e-08
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task.name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task.name}
+    subdir: ${hydra.job.num}
+
+
+

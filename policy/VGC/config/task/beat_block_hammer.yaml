@@ -1,8 +1,8 @@
-name: stack_blocks
+name: beat_block_hammer
 
 dataset:
   _target_: vgc.dataset.vgc_dataset.VGCDataset
-  zarr_path: data/stack_blocks_two-demo_3d_vision_easy-100-ppi.zarr
+  zarr_path: data/beat_block_hammer-demo_3d_vision_easy-100-ppi.zarr
   horizon: ${policy.horizon}
   pad_before: 1
   pad_after: 7
@@ -27,4 +27,3 @@ env_runner:
   n_obs_steps: ${policy.n_obs_steps}
   n_action_steps: ${policy.n_action_steps}
   task_name: ${name}
-

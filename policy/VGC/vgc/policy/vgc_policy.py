@@ -124,11 +124,8 @@ class VGCPolicy(BasePolicy):
         
         naction = self.normalizer['action'].normalize(batch['action'])
         
-        # Reconstruct normalized target keypose
-        # target_keypose is 18D (9 left + 9 right)
-        n_left_ep = self.normalizer['left_endpose'].normalize(batch['target_keypose'][:,:,:9])
-        n_right_ep = self.normalizer['right_endpose'].normalize(batch['target_keypose'][:,:,9:])
-        ntarget_keypose = torch.cat([n_left_ep, n_right_ep], dim=-1)
+        # Normalize target keypose directly using the 'target_keypose' key in normalizer
+        ntarget_keypose = self.normalizer['target_keypose'].normalize(batch['target_keypose'])
         
         point_cloud = nobs['point_cloud'] # (B, T, N, 6)
         images = batch['obs']['images']   # (B, T, K, C, H, W)
@@ -189,3 +186,78 @@ class VGCPolicy(BasePolicy):
         total_loss = loss_diffusion + loss_keypose
         
         return total_loss, {"loss_diffusion": loss_diffusion, "loss_keypose": loss_keypose}
+
+    def get_action(self, batch):
+        # Batch is a dict with 'obs'
+        # obs['point_cloud']: (B, T, N, 6)
+        # obs['images']: (B, T, K, C, H, W)
+        # obs['agent_pos']: (B, T, D_pos)
+        
+        nobs = {}
+        for key, value in batch['obs'].items():
+            if key in self.normalizer.params_dict:
+                nobs[key] = self.normalizer[key].normalize(value)
+            else:
+                nobs[key] = value
+        
+        point_cloud = nobs['point_cloud']
+        images = batch['obs']['images']
+        agent_pos = nobs['agent_pos']
+        
+        B, T, N, _ = point_cloud.shape
+        
+        # Flatten time dimension for encoding
+        point_cloud_flat = rearrange(point_cloud, 'b t n c -> (b t) n c')
+        images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
+        agent_pos_flat = rearrange(agent_pos, 'b t d -> (b t) d')
+        
+        # PointNet
+        point_features = self.pointnet(point_cloud_flat)
+        
+        # Fusion
+        fused_features = self.fusion(point_features, images_flat)
+        
+        # Global Pooling
+        global_fused = torch.max(fused_features, dim=1)[0]
+        
+        # Agent Pos
+        agent_pos_emb = self.agent_pos_mlp(agent_pos_flat)
+        
+        # Combine
+        features = torch.cat([global_fused, agent_pos_emb], dim=-1)
+        
+        # Predict Keypose
+        pred_keypose = self.keypose_head(features)
+        
+        # Reshape back
+        features = rearrange(features, '(b t) d -> b t d', b=B, t=T)
+        pred_keypose = rearrange(pred_keypose, '(b t) d -> b t d', b=B, t=T)
+        
+        # Construct Global Condition
+        n_obs = self.n_obs_steps
+        cond_features = features[:, :n_obs, :]
+        cond_keypose = pred_keypose[:, :n_obs, :]
+        
+        global_cond = torch.cat([cond_features, cond_keypose], dim=-1)
+        global_cond = rearrange(global_cond, 'b t d -> b (t d)')
+        
+        # Diffusion Sampling
+        # Initialize noise
+        naction = torch.randn((B, self.horizon, self.action_dim), device=global_cond.device)
+        
+        # DDPM/DDIM Scheduler Sampling
+        self.noise_scheduler.set_timesteps(self.noise_scheduler.config.num_train_timesteps)
+        
+        for t in self.noise_scheduler.timesteps:
+            # Predict noise
+            model_output = self.diffusion_unet(naction, t, global_cond=global_cond)
+            
+            # Compute previous noisy sample x_t -> x_t-1
+            naction = self.noise_scheduler.step(model_output, t, naction).prev_sample
+            
+        # Unnormalize action
+        action = self.normalizer['action'].unnormalize(naction)
+        
+        # Return action sequence
+        return action
+

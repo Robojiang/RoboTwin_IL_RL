@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torchvision.transforms as T
@@ -20,7 +21,32 @@ class SemanticGeometricFusion(nn.Module):
         
         # 1. Visual Encoder: DINOv2
         print(f"Loading {dino_model_name} from torch.hub...")
-        self.visual_encoder = torch.hub.load('facebookresearch/dinov2', dino_model_name)
+        # Use local cache if available, otherwise download
+        # 'source'='github' is default, but we can try to force using cache if we suspect network issues
+        # However, torch.hub.load usually handles caching.
+        # The error 'RemoteDisconnected' suggests a network issue during the check or download.
+        
+        # Try to load with 'trust_repo=True' and potentially handle offline mode if needed
+        # But torch.hub doesn't have a simple 'offline' flag.
+        # We can try to load from local directory if the user has downloaded it manually.
+        
+        try:
+            self.visual_encoder = torch.hub.load('facebookresearch/dinov2', dino_model_name)
+        except Exception as e:
+            print(f"Failed to load from torch.hub: {e}")
+            print("Attempting to load from local cache...")
+            try:
+                # Fallback to local cache if available
+                local_repo_path = os.path.expanduser("~/.cache/torch/hub/facebookresearch_dinov2_main")
+                if os.path.exists(local_repo_path):
+                    print(f"Found local repo at {local_repo_path}, loading with source='local'...")
+                    self.visual_encoder = torch.hub.load(local_repo_path, dino_model_name, source='local')
+                else:
+                    raise FileNotFoundError(f"Local repo not found at {local_repo_path}")
+            except Exception as local_e:
+                print(f"Failed to load from local cache: {local_e}")
+                raise e
+            
         self.visual_encoder.eval()
         
         # Freeze DINO parameters
