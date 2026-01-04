@@ -16,7 +16,7 @@ policy:
 
   horizon: 16
   n_action_steps: 8
-  n_obs_steps: 2
+  n_obs_steps: 3
   num_inference_steps: 100
   obs_as_global_cond: True
   diffusion_step_embed_dim: 256
@@ -26,6 +26,7 @@ policy:
   condition_type: "film"
   d_point: 128
   dino_model_name: 'dinov2_vits14'
+  use_pc_features: True
 
 ema:
   _target_: diffusion_policy_3d.model.diffusion.ema_model.EMAModel
@@ -36,14 +37,14 @@ ema:
   max_value: 0.9999
 
 dataloader:
-  batch_size: 4
+  batch_size: 32
   num_workers: 8
   shuffle: True
   pin_memory: True
   persistent_workers: False
 
 val_dataloader:
-  batch_size: 4
+  batch_size: 32
   num_workers: 8
   shuffle: False
   pin_memory: True
@@ -63,13 +64,13 @@ training:
   resume: True
   lr_scheduler: "cosine"
   lr_warmup_steps: 500
-  num_epochs: 100
+  num_epochs: 300
   gradient_accumulate_every: 1
   use_ema: True
-  rollout_every: 50
-  checkpoint_every: 10
-  val_every: 10
-  sample_every: 10
+  rollout_every: 500
+  checkpoint_every: 30
+  val_every: 30
+  sample_every: 30
   max_train_steps: null
   max_val_steps: null
   tqdm_interval_sec: 1.0

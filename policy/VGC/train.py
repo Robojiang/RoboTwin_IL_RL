@@ -38,6 +38,7 @@ class TrainVGCWorkspace:
     exclude_keys = tuple()
 
     def __init__(self, cfg: OmegaConf, output_dir=None):
+        print(">>> [Init] Starting Workspace initialization...")
         self.cfg = cfg
         self._output_dir = output_dir
         self._saving_thread = None
@@ -49,7 +50,9 @@ class TrainVGCWorkspace:
         random.seed(seed)
 
         # configure model
+        print(">>> [Init] Instantiating Model (Loading DINO)...")
         self.model = hydra.utils.instantiate(cfg.policy)
+        print(">>> [Init] Model Instantiated.")
 
         self.ema_model = None
         if cfg.training.use_ema:
@@ -60,6 +63,7 @@ class TrainVGCWorkspace:
 
         self.global_step = 0
         self.epoch = 0
+        print(">>> [Init] Workspace initialization complete.")
 
     @property
     def output_dir(self):
@@ -69,10 +73,25 @@ class TrainVGCWorkspace:
         return output_dir
 
     def run(self):
+        print(">>> [Run] Starting Training Run...")
         cfg = copy.deepcopy(self.cfg)
 
+        if cfg.training.debug:
+            cfg.training.num_epochs = 2
+            cfg.training.max_train_steps = 10
+            cfg.training.max_val_steps = 3
+            cfg.training.rollout_every = 1
+            cfg.training.checkpoint_every = 1
+            cfg.training.val_every = 1
+            cfg.training.sample_every = 1
+            cfg.dataloader.batch_size = 2
+            cfg.val_dataloader.batch_size = 2
+            print("DEBUG MODE: Enabled. Config updated for quick run.")
+
         # configure dataset
+        print(">>> [Run] Loading Dataset (This may take a while)...")
         dataset = hydra.utils.instantiate(cfg.task.dataset)
+        print(">>> [Run] Dataset Loaded.")
         assert isinstance(dataset, BaseDataset)
         train_dataloader = DataLoader(dataset, **cfg.dataloader)
         normalizer = dataset.get_normalizer()
@@ -170,11 +189,8 @@ class TrainVGCWorkspace:
                 loop.set_postfix(loss=loss.item())
                 self.global_step += 1
                 
-                # DEBUG MODE: Stop after one batch
-                if cfg.training.debug and batch_idx == 0:
-                    print("DEBUG MODE: Stopping after one batch.")
-                    self.save_checkpoint(tag="debug")
-                    return
+                if (cfg.training.max_train_steps is not None) and batch_idx >= (cfg.training.max_train_steps - 1):
+                    break
 
             # Epoch end
             train_loss = np.mean(train_losses)
@@ -186,8 +202,29 @@ class TrainVGCWorkspace:
                 policy = self.ema_model
             policy.eval()
             
-            # Run validation runner
+            # Validation Loop
             if (self.epoch % cfg.training.val_every) == 0:
+                with torch.no_grad():
+                    val_losses = list()
+                    for batch_idx, batch in enumerate(val_dataloader):
+                        n_batch = {}
+                        n_batch['action'] = batch['action'].to(device)
+                        n_batch['target_keypose'] = batch['target_keypose'].to(device)
+                        n_batch['obs'] = {}
+                        for k, v in batch['obs'].items():
+                            n_batch['obs'][k] = v.to(device)
+                        
+                        loss, loss_dict = policy(n_batch)
+                        val_losses.append(loss.item())
+                        
+                        if (cfg.training.max_val_steps is not None) and batch_idx >= (cfg.training.max_val_steps - 1):
+                            break
+                    
+                    if len(val_losses) > 0:
+                        step_log['val_loss'] = np.mean(val_losses)
+
+            # Run validation runner
+            if (self.epoch % cfg.training.rollout_every) == 0:
                 if env_runner is not None:
                     runner_log = env_runner.run(policy)
                     if runner_log is not None:
@@ -230,6 +267,7 @@ class TrainVGCWorkspace:
             "global_step": self.global_step
         }
         torch.save(payload, path.open("wb"))
+        print(f"Checkpoint saved to: {path.absolute()}")
         return str(path.absolute())
     
     def get_checkpoint_path(self, tag="latest"):

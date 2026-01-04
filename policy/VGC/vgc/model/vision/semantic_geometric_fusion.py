@@ -9,49 +9,66 @@ class SemanticGeometricFusion(nn.Module):
     Fuses 3D Point Cloud features with 2D Semantic features from a frozen DINOv2 model
     using a Cross-Attention mechanism.
     """
-    def __init__(self, d_point=128, dino_model_name='dinov2_vits14', num_heads=4, dropout=0.1):
+    def __init__(self, d_point=128, dino_model_name='dinov2_vits14', num_heads=4, dropout=0.1, load_vision_encoder=True):
         """
         Args:
             d_point (int): Dimension of the input point features.
             dino_model_name (str): Name of the DINOv2 model to load from torch.hub.
             num_heads (int): Number of heads for MultiheadAttention.
             dropout (float): Dropout rate.
+            load_vision_encoder (bool): Whether to load the DINOv2 model. Set to False if using precomputed features.
         """
         super().__init__()
         
         # 1. Visual Encoder: DINOv2
-        print(f"Loading {dino_model_name} from torch.hub...")
-        # Use local cache if available, otherwise download
-        # 'source'='github' is default, but we can try to force using cache if we suspect network issues
-        # However, torch.hub.load usually handles caching.
-        # The error 'RemoteDisconnected' suggests a network issue during the check or download.
-        
-        # Try to load with 'trust_repo=True' and potentially handle offline mode if needed
-        # But torch.hub doesn't have a simple 'offline' flag.
-        # We can try to load from local directory if the user has downloaded it manually.
-        
-        try:
-            self.visual_encoder = torch.hub.load('facebookresearch/dinov2', dino_model_name)
-        except Exception as e:
-            print(f"Failed to load from torch.hub: {e}")
-            print("Attempting to load from local cache...")
-            try:
-                # Fallback to local cache if available
-                local_repo_path = os.path.expanduser("~/.cache/torch/hub/facebookresearch_dinov2_main")
-                if os.path.exists(local_repo_path):
-                    print(f"Found local repo at {local_repo_path}, loading with source='local'...")
-                    self.visual_encoder = torch.hub.load(local_repo_path, dino_model_name, source='local')
-                else:
-                    raise FileNotFoundError(f"Local repo not found at {local_repo_path}")
-            except Exception as local_e:
-                print(f"Failed to load from local cache: {local_e}")
-                raise e
+        self.load_vision_encoder = load_vision_encoder
+        if self.load_vision_encoder:
+            print(f"Loading {dino_model_name}...")
             
-        self.visual_encoder.eval()
-        
-        # Freeze DINO parameters
-        for param in self.visual_encoder.parameters():
-            param.requires_grad = False
+            # Try to load from local 'assets' folder first
+            # Assuming assets is in the root of the workspace or relative to this file
+            # Let's try to find the workspace root
+            
+            # Current file: policy/VGC/vgc/model/vision/semantic_geometric_fusion.py
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # Go up 5 levels to reach workspace root: policy/VGC/vgc/model/vision -> policy/VGC/vgc/model -> policy/VGC/vgc -> policy/VGC -> policy -> root
+            workspace_root = os.path.abspath(os.path.join(current_dir, "../../../../../"))
+            local_model_path = os.path.join(workspace_root, "assets", f"{dino_model_name}.pth")
+            
+            if os.path.exists(local_model_path):
+                print(f"Found local model file at {local_model_path}. Loading directly...")
+                self.visual_encoder = torch.hub.load('facebookresearch/dinov2', dino_model_name, source='github', pretrained=False)
+                state_dict = torch.load(local_model_path, map_location="cpu")
+                self.visual_encoder.load_state_dict(state_dict)
+                print("Local weights loaded successfully.")
+            else:
+                # Fallback to torch.hub with potential local cache
+                print(f"Local model file not found at {local_model_path}. Trying torch.hub...")
+                try:
+                    self.visual_encoder = torch.hub.load('facebookresearch/dinov2', dino_model_name)
+                except Exception as e:
+                    print(f"Failed to load from torch.hub: {e}")
+                    print("Attempting to load from local cache...")
+                    try:
+                        # Fallback to local cache if available
+                        local_repo_path = os.path.expanduser("~/.cache/torch/hub/facebookresearch_dinov2_main")
+                        if os.path.exists(local_repo_path):
+                            print(f"Found local repo at {local_repo_path}, loading with source='local'...")
+                            self.visual_encoder = torch.hub.load(local_repo_path, dino_model_name, source='local')
+                        else:
+                            raise FileNotFoundError(f"Local repo not found at {local_repo_path}")
+                    except Exception as local_e:
+                        print(f"Failed to load from local cache: {local_e}")
+                        raise e
+                
+            self.visual_encoder.eval()
+            
+            # Freeze DINO parameters
+            for param in self.visual_encoder.parameters():
+                param.requires_grad = False
+        else:
+            print("Skipping DINOv2 model loading (expecting precomputed features).")
+            self.visual_encoder = None
             
         # DINOv2 ViT-S/14 feature dimension is 384
         if 'vits' in dino_model_name:
@@ -99,6 +116,9 @@ class SemanticGeometricFusion(nn.Module):
             patch_features = rearrange(precomputed_features, 'b k n d -> (b k) n d')
         else:
             assert images is not None, "Either images or precomputed_features must be provided"
+            if self.visual_encoder is None:
+                raise ValueError("Visual encoder is not loaded, but images were provided. Initialize with load_vision_encoder=True or provide precomputed_features.")
+            
             B, K, C, H, W = images.shape
             images_flat = rearrange(images, 'b k c h w -> (b k) c h w')
             images_flat = self.normalize(images_flat)

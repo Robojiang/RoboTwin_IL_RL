@@ -57,6 +57,7 @@ class VGCPolicy(BasePolicy):
                  # Custom params
                  d_point=128,
                  dino_model_name='dinov2_vits14',
+                 use_pc_features=False,
                  **kwargs):
         super().__init__()
         
@@ -74,7 +75,11 @@ class VGCPolicy(BasePolicy):
         self.pointnet = PointNetEncoder(in_channels=6, out_channels=d_point)
         
         # Semantic Geometric Fusion
-        self.fusion = SemanticGeometricFusion(d_point=d_point, dino_model_name=dino_model_name)
+        self.fusion = SemanticGeometricFusion(
+            d_point=d_point, 
+            dino_model_name=dino_model_name,
+            load_vision_encoder=not use_pc_features
+        )
         
         # Agent Pos Encoder
         agent_pos_shape = shape_meta['obs']['agent_pos']['shape']
