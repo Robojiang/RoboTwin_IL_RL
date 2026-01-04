@@ -4,6 +4,7 @@ import cv2
 import argparse
 import os
 import time
+import transforms3d as t3d
 try:
     import open3d as o3d
     HAS_OPEN3D = True
@@ -19,6 +20,11 @@ def visualize_keyframes(zarr_path, episode_idx=0, show_3d=False):
     point_cloud = root['data/point_cloud']
     keyframe_mask = root['data/keyframe_mask']
     episode_ends = root['meta/episode_ends']
+    
+    has_endpose = 'data/left_endpose' in root and 'data/right_endpose' in root
+    if has_endpose:
+        left_endpose = root['data/left_endpose']
+        right_endpose = root['data/right_endpose']
     
     has_images = 'data/images' in root
     if has_images:
@@ -74,11 +80,53 @@ def visualize_keyframes(zarr_path, episode_idx=0, show_3d=False):
         cv2.putText(img, label, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         return img
 
+    # Pre-calculate next keyframe indices
+    next_keyframe_indices = np.full(end_idx, -1, dtype=int)
+    last_kf = -1
+    # Iterate backwards
+    for i in range(end_idx - 1, start_idx - 1, -1):
+        if keyframe_mask[i]:
+            last_kf = i
+        next_keyframe_indices[i] = last_kf
+
     # Loop through frames
     for i in range(start_idx, end_idx):
         pcd = point_cloud[i]
         is_keyframe = keyframe_mask[i]
         
+        # Add Visualization Elements (Laser + Trajectory)
+        extra_points_list = []
+        if has_endpose:
+            for arm_name, endpose_data in [("left", left_endpose), ("right", right_endpose)]:
+                pose = endpose_data[i] # [x, y, z, qw, qx, qy, qz]
+                pos = pose[:3]
+                quat = pose[3:]
+                mat = t3d.quaternions.quat2mat(quat)
+                direction = mat[:, 0] # X-axis
+                
+                # 1. Laser (Red)
+                dists = np.linspace(0, 0.3, 50)
+                pts = pos + direction * dists[:, None]
+                cols = np.tile([1.0, 0.0, 0.0], (50, 1)) # Red
+                extra_points_list.append(np.hstack([pts, cols]))
+                
+                # 2. Trajectory Line to Next Keyframe (Green)
+                next_kf_idx = next_keyframe_indices[i]
+                if next_kf_idx != -1 and next_kf_idx != i:
+                    next_pose = endpose_data[next_kf_idx]
+                    next_pos = next_pose[:3]
+                    
+                    # Line points
+                    num_line_points = 50
+                    alphas = np.linspace(0, 1, num_line_points)[:, None]
+                    line_pts = pos * (1 - alphas) + next_pos * alphas
+                    line_cols = np.tile([0.0, 1.0, 0.0], (num_line_points, 1)) # Green
+                    extra_points_list.append(np.hstack([line_pts, line_cols]))
+
+        if extra_points_list:
+            extra_pcd = np.vstack(extra_points_list)
+            pcd = np.vstack([pcd, extra_pcd.astype(pcd.dtype)])
+
         # Extract Point Cloud
         x = pcd[:, 0]
         y = pcd[:, 1]

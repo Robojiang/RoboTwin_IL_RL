@@ -1,0 +1,2 @@
+[2026-01-04 11:06:11,348][dinov2][INFO] - using MLP layer as FFN
+[2026-01-04 11:06:11,772][diffusion_policy_3d.model.diffusion.conditional_unet1d][INFO] - number of parameters: 7.308750e+07

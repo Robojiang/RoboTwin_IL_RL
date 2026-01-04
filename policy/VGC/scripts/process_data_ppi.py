@@ -20,6 +20,10 @@ def load_hdf5(dataset_path):
         vector = root["/joint_action/vector"][()]
         pointcloud = root["/pointcloud"][()]
         
+        # Load End Poses
+        left_endpose = root["/endpose/left_endpose"][()]
+        right_endpose = root["/endpose/right_endpose"][()]
+        
         # Load RGB Images
         images = []
         # Sort keys to ensure consistent order: front, head, left, right
@@ -40,7 +44,7 @@ def load_hdf5(dataset_path):
         else:
             images = None
 
-    return left_gripper, left_arm, right_gripper, right_arm, vector, pointcloud, images
+    return left_gripper, left_arm, right_gripper, right_arm, vector, pointcloud, images, left_endpose, right_endpose
 
 def get_keyframe_mask(left_gripper, right_gripper, left_arm, right_arm, stopping_delta=0.01, gripper_delta=0.05):
     """
@@ -139,7 +143,8 @@ def main():
             (
                 left_gripper, left_arm, 
                 right_gripper, right_arm, 
-                vector, pointcloud, images
+                vector, pointcloud, images,
+                left_endpose, right_endpose
             ) = load_hdf5(load_path)
         except Exception as e:
             print(f"Skipping episode {current_ep}: {e}")
@@ -157,6 +162,8 @@ def main():
         ep_action = vector[1:]
         ep_pointcloud = pointcloud[:-1]
         ep_mask = full_mask[:-1]
+        ep_left_endpose = left_endpose[:-1]
+        ep_right_endpose = right_endpose[:-1]
         
         ep_images = None
         if images is not None:
@@ -167,7 +174,9 @@ def main():
             "state": ep_state,
             "action": ep_action,
             "point_cloud": ep_pointcloud,
-            "keyframe_mask": ep_mask
+            "keyframe_mask": ep_mask,
+            "left_endpose": ep_left_endpose,
+            "right_endpose": ep_right_endpose
         }
         if ep_images is not None:
             current_data["images"] = ep_images
@@ -181,7 +190,9 @@ def main():
                 "action": (100, ep_action.shape[1]),
                 "point_cloud": (100, ep_pointcloud.shape[1], ep_pointcloud.shape[2]),
                 "keyframe_mask": (100,),
-                "episode_ends": (100,)
+                "episode_ends": (100,),
+                "left_endpose": (100, ep_left_endpose.shape[1]),
+                "right_endpose": (100, ep_right_endpose.shape[1])
             }
             if ep_images is not None:
                 chunks["images"] = (100, ep_images.shape[1], ep_images.shape[2], ep_images.shape[3], ep_images.shape[4])
