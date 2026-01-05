@@ -232,9 +232,16 @@ class TrainVGCWorkspace:
             
             # Checkpoint
             if (self.epoch % cfg.training.checkpoint_every) == 0 and cfg.checkpoint.save_ckpt:
-                # Save latest
-                self.save_checkpoint()
-                # Save topk
+                # 1. Save periodic checkpoint (History) - 也就是你想要的“带上代数”
+                # 这会生成如 epoch=0030.ckpt, epoch=0060.ckpt 的文件，保留训练历史
+                self.save_checkpoint(tag=f"epoch={self.epoch:04d}")
+
+                # 2. Save latest checkpoint (Latest) - 用于断点续训
+                # 对应配置文件中的 save_last_ckpt: True
+                if cfg.checkpoint.get('save_last_ckpt', True):
+                    self.save_checkpoint(tag="latest")
+
+                # 3. Save TopK (Best) - 保存指标最好的模型
                 if env_runner is not None:
                     metric_key = cfg.checkpoint.topk.monitor_key
                     metric_value = step_log.get(metric_key, 0.0)
