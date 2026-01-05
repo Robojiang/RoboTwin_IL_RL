@@ -114,46 +114,61 @@ def get_model(usr_args):
     
     ckpt_path = None
     
-    # 1. Try explicit path if passed (we can add this to eval.sh args if needed)
-    # 2. Try standard DP3 path structure if ckpt_setting is used
-    # 3. Search for latest in data/outputs
+    # 0. Check policy/VGC/checkpoints/<task_name> (User specified location)
+    checkpoints_dir = os.path.join(vgc_dir, "checkpoints")
+    task_ckpt_dir = os.path.join(checkpoints_dir, usr_args['task_name'])
     
-    base_output_dir = os.path.join(vgc_dir, "data/outputs")
-    
-    # Find latest directory matching task name
-    if os.path.exists(base_output_dir):
-        # Try to find run directories directly in base_output_dir (Flat structure)
-        runs = sorted([r for r in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, r)) and usr_args['task_name'] in r], reverse=True)
+    if os.path.exists(task_ckpt_dir):
+        ckpts = [f for f in os.listdir(task_ckpt_dir) if f.endswith('.ckpt') or f.endswith('.pth')]
+        if ckpts:
+            if 'latest.ckpt' in ckpts:
+                ckpt_path = os.path.join(task_ckpt_dir, 'latest.ckpt')
+            elif 'best.ckpt' in ckpts:
+                ckpt_path = os.path.join(task_ckpt_dir, 'best.ckpt')
+            else:
+                ckpt_path = os.path.join(task_ckpt_dir, sorted(ckpts)[-1])
+
+    if ckpt_path is None:
+        # 1. Try explicit path if passed (we can add this to eval.sh args if needed)
+        # 2. Try standard DP3 path structure if ckpt_setting is used
+        # 3. Search for latest in data/outputs
         
-        ckpt_dir = None
-        if runs:
-            # Found in flat structure
-            latest_run = runs[0]
-            ckpt_dir = os.path.join(base_output_dir, latest_run, "checkpoints")
-        else:
-            # Try nested structure (outputs/DATE/RUN_DIR)
-            dates = sorted([d for d in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, d))], reverse=True)
-            for date in dates:
-                date_dir = os.path.join(base_output_dir, date)
-                # List all run directories
-                runs = sorted([r for r in os.listdir(date_dir) if usr_args['task_name'] in r], reverse=True)
-                if runs:
-                    # Found latest run
-                    latest_run = runs[0]
-                    ckpt_dir = os.path.join(date_dir, latest_run, "checkpoints")
-                    break
+        base_output_dir = os.path.join(vgc_dir, "data/outputs")
         
-        if ckpt_dir and os.path.exists(ckpt_dir):
-            # Find best or latest ckpt
-            ckpts = [f for f in os.listdir(ckpt_dir) if f.endswith('.ckpt') or f.endswith('.pth')]
-            if ckpts:
-                # Prefer 'latest.ckpt' or 'best.ckpt' or just the last one
-                if 'latest.ckpt' in ckpts:
-                    ckpt_path = os.path.join(ckpt_dir, 'latest.ckpt')
-                elif 'best.ckpt' in ckpts:
-                    ckpt_path = os.path.join(ckpt_dir, 'best.ckpt')
-                else:
-                    ckpt_path = os.path.join(ckpt_dir, sorted(ckpts)[-1])
+        # Find latest directory matching task name
+        if os.path.exists(base_output_dir):
+            # Try to find run directories directly in base_output_dir (Flat structure)
+            runs = sorted([r for r in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, r)) and usr_args['task_name'] in r], reverse=True)
+            
+            ckpt_dir = None
+            if runs:
+                # Found in flat structure
+                latest_run = runs[0]
+                ckpt_dir = os.path.join(base_output_dir, latest_run, "checkpoints")
+            else:
+                # Try nested structure (outputs/DATE/RUN_DIR)
+                dates = sorted([d for d in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, d))], reverse=True)
+                for date in dates:
+                    date_dir = os.path.join(base_output_dir, date)
+                    # List all run directories
+                    runs = sorted([r for r in os.listdir(date_dir) if usr_args['task_name'] in r], reverse=True)
+                    if runs:
+                        # Found latest run
+                        latest_run = runs[0]
+                        ckpt_dir = os.path.join(date_dir, latest_run, "checkpoints")
+                        break
+            
+            if ckpt_dir and os.path.exists(ckpt_dir):
+                # Find best or latest ckpt
+                ckpts = [f for f in os.listdir(ckpt_dir) if f.endswith('.ckpt') or f.endswith('.pth')]
+                if ckpts:
+                    # Prefer 'latest.ckpt' or 'best.ckpt' or just the last one
+                    if 'latest.ckpt' in ckpts:
+                        ckpt_path = os.path.join(ckpt_dir, 'latest.ckpt')
+                    elif 'best.ckpt' in ckpts:
+                        ckpt_path = os.path.join(ckpt_dir, 'best.ckpt')
+                    else:
+                        ckpt_path = os.path.join(ckpt_dir, sorted(ckpts)[-1])
             
     if ckpt_path is None:
         print(f"Warning: No checkpoint found for task {usr_args['task_name']}. Using random weights.")

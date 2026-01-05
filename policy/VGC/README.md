@@ -68,7 +68,7 @@ Evaluate the trained policy in the simulation environment.
 # Usage: bash policy/VGC/eval.sh <task_name> <task_config> <ckpt_setting> <seed> <gpu_id>
 
 # Example
-bash policy/VGC/eval.sh beat_block_hammer demo_3d_vision_easy debug 0 0
+bash eval.sh beat_block_hammer demo_3d_vision_easy debug 0 0
 ```
 
 *   **Inference Logic**:
