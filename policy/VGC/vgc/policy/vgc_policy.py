@@ -142,16 +142,17 @@ class VGCPolicy(BasePolicy):
         
         # PointNet
         point_features = self.pointnet(point_cloud_flat) # ((B*T), N, D_point)
+        point_coords = point_cloud_flat[..., :3]
         
         # Fusion
         if 'dino_features' in batch['obs']:
             dino_features = batch['obs']['dino_features'] # (B, T, K, N_patches, D_feat)
             dino_features_flat = rearrange(dino_features, 'b t k n d -> (b t) k n d')
-            fused_features = self.fusion(point_features, precomputed_features=dino_features_flat)
+            fused_features = self.fusion(point_features, point_coords=point_coords, precomputed_features=dino_features_flat)
         else:
             images = batch['obs']['images']   # (B, T, K, C, H, W)
             images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
-            fused_features = self.fusion(point_features, images=images_flat) # ((B*T), N, D_point)
+            fused_features = self.fusion(point_features, point_coords=point_coords, images=images_flat) # ((B*T), N, D_point)
         
         # Global Pooling (Max)
         global_fused = torch.max(fused_features, dim=1)[0] # ((B*T), D_point)
@@ -221,16 +222,17 @@ class VGCPolicy(BasePolicy):
         
         # PointNet
         point_features = self.pointnet(point_cloud_flat)
+        point_coords = point_cloud_flat[..., :3]
         
         # Fusion
         if 'dino_features' in batch['obs']:
             dino_features = batch['obs']['dino_features']
             dino_features_flat = rearrange(dino_features, 'b t k n d -> (b t) k n d')
-            fused_features = self.fusion(point_features, precomputed_features=dino_features_flat)
+            fused_features = self.fusion(point_features, point_coords=point_coords, precomputed_features=dino_features_flat)
         else:
             images = batch['obs']['images']
             images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
-            fused_features = self.fusion(point_features, images=images_flat)
+            fused_features = self.fusion(point_features, point_coords=point_coords, images=images_flat)
         
         # Global Pooling
         global_fused = torch.max(fused_features, dim=1)[0]

@@ -8,8 +8,10 @@ import random
 import wandb
 import pathlib
 import time
+import torch.distributed as dist
 from omegaconf import OmegaConf
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
 from tqdm import tqdm
 from termcolor import cprint
 
@@ -48,6 +50,7 @@ class TrainVGCWorkspace:
         torch.manual_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
         # configure model
         print(">>> [Init] Instantiating Model (Loading DINO)...")
@@ -76,6 +79,15 @@ class TrainVGCWorkspace:
         print(">>> [Run] Starting Training Run...")
         cfg = copy.deepcopy(self.cfg)
 
+        # --- Distributed setup ---
+        world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        use_distributed = world_size > 1
+        if use_distributed and not dist.is_initialized():
+            dist.init_process_group(backend="nccl")
+        rank = dist.get_rank() if use_distributed else 0
+        local_rank = int(os.environ.get("LOCAL_RANK", 0)) if use_distributed else 0
+        is_main = (rank == 0)
+
         if cfg.training.debug:
             cfg.training.num_epochs = 2
             cfg.training.max_train_steps = 10
@@ -93,15 +105,38 @@ class TrainVGCWorkspace:
         dataset = hydra.utils.instantiate(cfg.task.dataset)
         print(">>> [Run] Dataset Loaded.")
         assert isinstance(dataset, BaseDataset)
-        train_dataloader = DataLoader(dataset, **cfg.dataloader)
+        # Use DistributedSampler when running with multiple GPUs
+        train_sampler = None
+        if use_distributed:
+            train_sampler = DistributedSampler(
+                dataset,
+                num_replicas=world_size,
+                rank=rank,
+                shuffle=cfg.dataloader.get("shuffle", True),
+            )
+        dataloader_kwargs = dict(cfg.dataloader)
+        if train_sampler is not None:
+            dataloader_kwargs.pop("shuffle", None)
+        train_dataloader = DataLoader(dataset, sampler=train_sampler, **dataloader_kwargs)
         normalizer = dataset.get_normalizer()
 
         # configure validation dataset
         val_dataset = dataset.get_validation_dataset()
-        val_dataloader = DataLoader(val_dataset, **cfg.val_dataloader)
+        val_sampler = None
+        if use_distributed:
+            val_sampler = DistributedSampler(
+                val_dataset,
+                num_replicas=world_size,
+                rank=rank,
+                shuffle=False,
+            )
+        val_loader_kwargs = dict(cfg.val_dataloader)
+        if val_sampler is not None:
+            val_loader_kwargs.pop("shuffle", None)
+        val_dataloader = DataLoader(val_dataset, sampler=val_sampler, **val_loader_kwargs)
 
         self.model.set_normalizer(normalizer)
-        if cfg.training.use_ema:
+        if cfg.training.use_ema and self.ema_model is not None:
             self.ema_model.set_normalizer(normalizer)
 
         # configure lr scheduler
@@ -126,12 +161,14 @@ class TrainVGCWorkspace:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         cfg.logging.name = f"{cfg.task.name}_{timestamp}"
         
-        wandb_run = wandb.init(
-            dir=str(self.output_dir),
-            config=OmegaConf.to_container(cfg, resolve=True),
-            **cfg.logging,
-        )
-        wandb.config.update({"output_dir": self.output_dir})
+        wandb_run = None
+        if is_main:
+            wandb_run = wandb.init(
+                dir=str(self.output_dir),
+                config=OmegaConf.to_container(cfg, resolve=True),
+                **cfg.logging,
+            )
+            wandb.config.update({"output_dir": self.output_dir})
 
         # configure checkpoint
         topk_manager = TopKCheckpointManager(
@@ -140,10 +177,27 @@ class TrainVGCWorkspace:
         )
 
         # device transfer
-        device = torch.device(cfg.training.device)
+        device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else cfg.training.device)
         self.model.to(device)
-        if self.ema_model is not None:
+
+        if use_distributed:
+            self.model = DDP(self.model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
+            base_model = self.model.module
+        else:
+            base_model = self.model
+
+        # Only keep EMA on main process to save memory
+        if cfg.training.use_ema and self.ema_model is not None:
+            # In DDP, we can't easily share EMA across processes without complex sync.
+            # Standard practice: keep EMA on all ranks but only save rank 0.
+            # Or, if memory is tight, keep EMA on CPU and move to GPU only for update (slow).
+            # Current approach: Keep on GPU for all ranks to ensure correct updates, 
+            # but we might be hitting OOM.
+            
+            # Let's try to keep EMA on all ranks for now to avoid logic errors, 
+            # but we need to be careful about memory.
             self.ema_model.to(device)
+
         optimizer_to(self.optimizer, device)
 
         # training loop
@@ -152,6 +206,8 @@ class TrainVGCWorkspace:
             train_losses = list()
             
             self.model.train()
+            if train_sampler is not None:
+                train_sampler.set_epoch(self.epoch)
             loop = tqdm(train_dataloader, desc=f"Epoch {self.epoch}", leave=False)
             
             for batch_idx, batch in enumerate(loop):
@@ -171,12 +227,12 @@ class TrainVGCWorkspace:
                 self.optimizer.step()
                 lr_scheduler.step()
                 
-                if cfg.training.use_ema:
-                    ema.step(self.model)
+                if cfg.training.use_ema and self.ema_model is not None:
+                    ema.step(base_model)
                 
                 train_losses.append(loss.item())
                 
-                if (self.global_step % cfg.training.sample_every) == 0:
+                if is_main and (self.global_step % cfg.training.sample_every) == 0:
                     step_log = {
                         'train_loss': loss.item(),
                         'global_step': self.global_step,
@@ -197,8 +253,8 @@ class TrainVGCWorkspace:
             step_log['train_loss'] = train_loss
             
             # Validation
-            policy = self.model
-            if cfg.training.use_ema:
+            policy = base_model
+            if cfg.training.use_ema and self.ema_model is not None:
                 policy = self.ema_model
             policy.eval()
             
@@ -220,18 +276,18 @@ class TrainVGCWorkspace:
                         if (cfg.training.max_val_steps is not None) and batch_idx >= (cfg.training.max_val_steps - 1):
                             break
                     
-                    if len(val_losses) > 0:
+                    if len(val_losses) > 0 and is_main:
                         step_log['val_loss'] = np.mean(val_losses)
 
             # Run validation runner
-            if (self.epoch % cfg.training.rollout_every) == 0:
+            if (self.epoch % cfg.training.rollout_every) == 0 and is_main:
                 if env_runner is not None:
                     runner_log = env_runner.run(policy)
                     if runner_log is not None:
                         step_log.update(runner_log)
             
             # Checkpoint
-            if (self.epoch % cfg.training.checkpoint_every) == 0 and cfg.checkpoint.save_ckpt:
+            if is_main and (self.epoch % cfg.training.checkpoint_every) == 0 and cfg.checkpoint.save_ckpt:
                 # 1. Save periodic checkpoint (History) - 也就是你想要的“带上代数”
                 # 这会生成如 epoch=0030.ckpt, epoch=0060.ckpt 的文件，保留训练历史
                 self.save_checkpoint(tag=f"epoch={self.epoch:04d}")
@@ -253,8 +309,13 @@ class TrainVGCWorkspace:
                     if topk_path is not None:
                         self.save_checkpoint(path=pathlib.Path(topk_path))
 
-            wandb.log(step_log, step=self.global_step)
+            if is_main:
+                wandb.log(step_log, step=self.global_step)
             self.epoch += 1
+
+        # cleanup
+        if use_distributed and dist.is_initialized():
+            dist.destroy_process_group()
 
     def save_checkpoint(self, path=None, tag="latest"):
         if path is None:
@@ -263,10 +324,11 @@ class TrainVGCWorkspace:
             path = pathlib.Path(path)
         
         path.parent.mkdir(parents=False, exist_ok=True)
+        model_to_save = self.model.module if isinstance(self.model, DDP) else self.model
         payload = {
             "cfg": self.cfg,
             "state_dicts": {
-                "model": self.model.state_dict(),
+                "model": model_to_save.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
                 "ema_model": self.ema_model.state_dict() if self.ema_model else None,
             },
