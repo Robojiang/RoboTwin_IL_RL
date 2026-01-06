@@ -1,0 +1,110 @@
+name: aim_policy
+policy:
+  _target_: aim_policy.AIMPolicy
+  shape_meta: ${task.shape_meta}
+  noise_scheduler:
+    _target_: diffusers.schedulers.scheduling_ddpm.DDPMScheduler
+    num_train_timesteps: 100
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: true
+    prediction_type: epsilon
+  horizon: 16
+  n_action_steps: 8
+  n_obs_steps: 2
+  num_inference_steps: 100
+  obs_as_global_cond: true
+  diffusion_step_embed_dim: 256
+  down_dims:
+  - 256
+  - 512
+  - 1024
+  kernel_size: 5
+  n_groups: 8
+  condition_type: film
+  use_pc_color: true
+  use_aux_points: true
+  aux_point_num: 100
+  pointcloud_encoder_cfg:
+    out_channels: 256
+    use_layernorm: true
+    final_norm: layernorm
+ema:
+  _target_: diffusion_policy_3d.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: true
+  pin_memory: true
+  persistent_workers: false
+val_dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: false
+  pin_memory: true
+  persistent_workers: false
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 0.0001
+  betas:
+  - 0.95
+  - 0.999
+  eps: 1.0e-08
+  weight_decay: 1.0e-06
+training:
+  device: cuda:0
+  seed: 42
+  debug: false
+  resume: true
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 3000
+  gradient_accumulate_every: 1
+  checkpoint_every: 50
+  val_every: 50
+  sample_every: 50
+  output_dir: data/outputs/${name}/${task_name}
+task:
+  name: beat_block_hammer
+  dataset:
+    _target_: vgc.dataset.vgc_dataset.VGCDataset
+    zarr_path: data/beat_block_hammer-demo_3d_vision_easy-100-ppi.zarr
+    horizon: ${policy.horizon}
+    pad_before: ${eval:'${policy.n_obs_steps}-1'}
+    pad_after: ${eval:'${policy.n_action_steps}-1'}
+    seed: 42
+    val_ratio: 0.02
+    max_train_episodes: null
+  shape_meta:
+    action:
+      shape:
+      - 14
+    obs:
+      agent_pos:
+        shape:
+        - 32
+      point_cloud:
+        shape:
+        - 1024
+        - 6
+      images:
+        shape:
+        - 4
+        - 3
+        - 224
+        - 224
+      dino_features:
+        shape:
+        - 4
+        - 196
+        - 384
+  env_runner:
+    _target_: diffusion_policy_3d.env_runner.robot_runner.RobotRunner
+    max_steps: 300
+    n_obs_steps: ${policy.n_obs_steps}
+    n_action_steps: ${policy.n_action_steps}
+    task_name: ${name}

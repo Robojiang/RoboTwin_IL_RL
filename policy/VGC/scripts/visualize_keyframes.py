@@ -228,7 +228,8 @@ def visualize_keyframes(zarr_path, episode_idx=0, show_3d=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # stack_blocks_two-demo_3d_vision_easy-100-ppi.zarr beat_block_hammer-demo_3d_vision_easy-100-ppi.zarr
-    parser.add_argument("--zarr_path", type=str, default='policy/VGC/data/stack_blocks_two-demo_3d_vision_easy-100-ppi.zarr', help="Path to the processed Zarr file")
+    # parser.add_argument("--zarr_path", type=str, default='policy/VGC/data/stack_blocks_two-demo_3d_vision_easy-100-ppi.zarr', help="Path to the processed Zarr file")
+    parser.add_argument("--zarr_path", type=str, default='policy/VGC/data/beat_block_hammer-demo_3d_vision_easy-100-ppi.zarr', help="Path to the processed Zarr file")
     parser.add_argument("--episode", type=int, default=0, help="Episode index to visualize")
     parser.add_argument("--show_3d", default=True, help="Enable 3D Open3D visualization")
     args = parser.parse_args()

@@ -23,6 +23,7 @@ assets/*
 policy/weights/*
 policy/VGC/data/*
 envs/curobo/*
+policy/AIM/data/*
 
 .vscode
 /config.json
