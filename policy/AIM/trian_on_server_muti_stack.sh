@@ -5,4 +5,4 @@ source /opt/miniconda3/etc/profile.d/conda.sh
 
 conda activate robotwin
 
-torchrun --nproc_per_node=4 --master_port=29501 train.py task=stack_blocks_two
+torchrun --nproc_per_node=2 --master_port=29501 train.py task=stack_blocks_two
