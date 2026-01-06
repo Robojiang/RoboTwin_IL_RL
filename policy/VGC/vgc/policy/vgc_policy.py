@@ -74,7 +74,7 @@ class VGCPolicy(BasePolicy):
         # PointNet
         self.pointnet = PointNetEncoder(in_channels=6, out_channels=d_point)
         
-        # Semantic Geometric Fusion
+        # Semantic Geometric Fusion (Simplified for semantic extraction)
         self.fusion = SemanticGeometricFusion(
             d_point=d_point, 
             dino_model_name=dino_model_name,
@@ -91,16 +91,23 @@ class VGCPolicy(BasePolicy):
         )
         
         # 2. Heads
-        # Keypose Head
+        # Keypose Head (Predicts 18D normalized pose)
         self.keypose_dim = 18 # 9 (left) + 9 (right)
         self.keypose_head = nn.Sequential(
-            nn.Linear(d_point * 2, 128),
+            nn.Linear(d_point * 3, 128),
             nn.ReLU(),
             nn.Linear(128, self.keypose_dim)
         )
+        # Keypose Embedding (Converts 18D prediction back to d_point feature space)
+        self.keypose_emb_mlp = nn.Sequential(
+            nn.Linear(self.keypose_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, d_point)
+        )
         
         # 3. Diffusion Model
-        global_cond_dim = (d_point * 2 + self.keypose_dim) * n_obs_steps
+        # Total Cond Dim = [Point + Semantic + AgentPos + KeyposeEmb] = d_point * 4
+        global_cond_dim = (d_point * 4) * n_obs_steps
         
         self.diffusion_unet = ConditionalUnet1D(
             input_dim=self.action_dim,
@@ -144,24 +151,24 @@ class VGCPolicy(BasePolicy):
         point_features = self.pointnet(point_cloud_flat) # ((B*T), N, D_point)
         point_coords = point_cloud_flat[..., :3]
         
-        # Fusion
+        # Fusion (Semantic extraction only)
         if 'dino_features' in batch['obs']:
             dino_features = batch['obs']['dino_features'] # (B, T, K, N_patches, D_feat)
             dino_features_flat = rearrange(dino_features, 'b t k n d -> (b t) k n d')
-            fused_features = self.fusion(point_features, point_coords=point_coords, precomputed_features=dino_features_flat)
+            global_semantic = self.fusion(precomputed_features=dino_features_flat)
         else:
             images = batch['obs']['images']   # (B, T, K, C, H, W)
             images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
-            fused_features = self.fusion(point_features, point_coords=point_coords, images=images_flat) # ((B*T), N, D_point)
+            global_semantic = self.fusion(images=images_flat) 
         
-        # Global Pooling (Max)
-        global_fused = torch.max(fused_features, dim=1)[0] # ((B*T), D_point)
+        # Global Pooling (Max) from PointNet
+        global_point = torch.max(point_features, dim=1)[0] # ((B*T), D_point)
         
         # Agent Pos
         agent_pos_emb = self.agent_pos_mlp(agent_pos_flat) # ((B*T), D_point)
         
-        # Combine for Keypose Head
-        features = torch.cat([global_fused, agent_pos_emb], dim=-1) # ((B*T), 2*D_point)
+        # Combine [Point, Semantic, Agent]
+        features = torch.cat([global_point, global_semantic, agent_pos_emb], dim=-1) # ((B*T), 3*D_point)
         
         # Predict Keypose
         pred_keypose = self.keypose_head(features) # ((B*T), keypose_dim)
@@ -171,12 +178,16 @@ class VGCPolicy(BasePolicy):
         pred_keypose = rearrange(pred_keypose, '(b t) d -> b t d', b=B, t=T)
         
         # Construct Global Condition for Diffusion
-        # Take only the first n_obs_steps
-        n_obs = self.n_obs_steps
-        cond_features = features[:, :n_obs, :]
-        cond_keypose = pred_keypose[:, :n_obs, :]
+        # 1. Project predicted keypose to feature space
+        # pred_keypose: (B, T, 18)
+        pred_keypose_flat = rearrange(pred_keypose, 'b t d -> (b t) d')
+        keypose_emb = self.keypose_emb_mlp(pred_keypose_flat)
+        keypose_emb = rearrange(keypose_emb, '(b t) d -> b t d', b=B, t=T)
         
-        global_cond = torch.cat([cond_features, cond_keypose], dim=-1) # (B, n_obs, D_cond)
+        # 2. Combine all contextual features
+        # features already has [Point + Semantic + AgentPos] (3*d_point)
+        n_obs = self.n_obs_steps
+        global_cond = torch.cat([features[:, :n_obs, :], keypose_emb[:, :n_obs, :]], dim=-1) # (B, n_obs, 4*d_point)
         global_cond = rearrange(global_cond, 'b t d -> b (t d)')
         
         # Diffusion Loss
@@ -194,7 +205,7 @@ class VGCPolicy(BasePolicy):
         # Keypose Loss
         loss_keypose = F.mse_loss(pred_keypose, ntarget_keypose)
         
-        total_loss = loss_diffusion + loss_keypose
+        total_loss = loss_diffusion + 0.2 * loss_keypose
         
         return total_loss, {"loss_diffusion": loss_diffusion, "loss_keypose": loss_keypose}
 
@@ -224,37 +235,40 @@ class VGCPolicy(BasePolicy):
         point_features = self.pointnet(point_cloud_flat)
         point_coords = point_cloud_flat[..., :3]
         
-        # Fusion
+        # Fusion (Semantic extraction only)
         if 'dino_features' in batch['obs']:
             dino_features = batch['obs']['dino_features']
             dino_features_flat = rearrange(dino_features, 'b t k n d -> (b t) k n d')
-            fused_features = self.fusion(point_features, point_coords=point_coords, precomputed_features=dino_features_flat)
+            global_semantic = self.fusion(precomputed_features=dino_features_flat)
         else:
             images = batch['obs']['images']
             images_flat = rearrange(images, 'b t k c h w -> (b t) k c h w')
-            fused_features = self.fusion(point_features, point_coords=point_coords, images=images_flat)
+            global_semantic = self.fusion(images=images_flat)
         
-        # Global Pooling
-        global_fused = torch.max(fused_features, dim=1)[0]
+        # Global Pooling from PointNet
+        global_point = torch.max(point_features, dim=1)[0]
         
         # Agent Pos
         agent_pos_emb = self.agent_pos_mlp(agent_pos_flat)
         
         # Combine
-        features = torch.cat([global_fused, agent_pos_emb], dim=-1)
-        
-        # Predict Keypose
-        pred_keypose = self.keypose_head(features)
-        
+        features = torch.cat([global_point, global_semantic, agent_pos_emb], dim=-1)
         # Reshape back
         features = rearrange(features, '(b t) d -> b t d', b=B, t=T)
         pred_keypose = rearrange(pred_keypose, '(b t) d -> b t d', b=B, t=T)
         
         # Construct Global Condition
-        n_obs = self.n_obs_steps
-        cond_features = features[:, :n_obs, :]
-        cond_keypose = pred_keypose[:, :n_obs, :]
+        # 1. Project predicted keypose to feature space
+        pred_keypose_flat = rearrange(pred_keypose, 'b t d -> (b t) d')
+        keypose_emb = self.keypose_emb_mlp(pred_keypose_flat)
+        keypose_emb = rearrange(keypose_emb, '(b t) d -> b t d', b=B, t=T)
         
+        # 2. Combine
+        n_obs = self.n_obs_steps
+        global_cond = torch.cat([features[:, :n_obs, :], keypose_emb[:, :n_obs, :]], dim=-1)
+        global_cond = rearrange(global_cond, 'b t d -> b (t d)')
+        
+        # Diffusion Sampling
         global_cond = torch.cat([cond_features, cond_keypose], dim=-1)
         global_cond = rearrange(global_cond, 'b t d -> b (t d)')
         

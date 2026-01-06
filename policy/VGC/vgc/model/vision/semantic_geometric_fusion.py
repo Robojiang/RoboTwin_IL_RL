@@ -9,16 +9,12 @@ class SemanticGeometricFusion(nn.Module):
     Fuses 3D Point Cloud features with 2D Semantic features from a frozen DINOv2 model
     using a Cross-Attention mechanism.
     """
-    def __init__(self, d_point=128, dino_model_name='dinov2_vits14', num_heads=4, dropout=0.1, load_vision_encoder=True, max_cameras=10, max_patches=256):
+    def __init__(self, d_point=128, dino_model_name='dinov2_vits14', load_vision_encoder=True):
         """
         Args:
-            d_point (int): Dimension of the input point features.
-            dino_model_name (str): Name of the DINOv2 model to load from torch.hub.
-            num_heads (int): Number of heads for MultiheadAttention.
-            dropout (float): Dropout rate.
-            load_vision_encoder (bool): Whether to load the DINOv2 model. Set to False if using precomputed features.
-            max_cameras (int): Maximum number of cameras for positional embedding.
-            max_patches (int): Maximum number of patches for positional embedding.
+            d_point (int): Dimension of the output semantic features.
+            dino_model_name (str): Name of the DINOv2 model.
+            load_vision_encoder (bool): Whether to load the DINOv2 model.
         """
         super().__init__()
         
@@ -92,48 +88,22 @@ class SemanticGeometricFusion(nn.Module):
         # 2. Projection Layer
         self.visual_proj = nn.Linear(self.d_dino, d_point)
         
-        # Positional Embeddings
-        self.cam_embed = nn.Parameter(torch.randn(1, max_cameras, 1, d_point) * 0.02)
-        self.pos_embed = nn.Parameter(torch.randn(1, 1, max_patches, d_point) * 0.02)
-        self.point_pos_proj = nn.Linear(3, d_point)
-        
-        # Normalization before Attention
-        self.vis_norm = nn.LayerNorm(d_point)
-        self.point_norm = nn.LayerNorm(d_point)
-        
-        # 3. Fusion Layer: Cross Attention
-        self.cross_attn = nn.MultiheadAttention(embed_dim=d_point, num_heads=num_heads, dropout=dropout, batch_first=True)
-        
-        # 4. Gating/Residual & Norm
-        self.layer_norm = nn.LayerNorm(d_point)
-        self.gate = nn.Parameter(torch.zeros(1))
-        
         # Standard ImageNet normalization for DINO
         self.normalize = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    def forward(self, point_features, point_coords=None, images=None, precomputed_features=None):
+    def forward(self, images=None, precomputed_features=None):
         """
         Args:
-            point_features: (B, N, D_point) - Geometry features from PointNet.
-            point_coords: (B, N, 3) - XYZ coordinates of the points.
             images: (B, K, C, H, W) - Multi-view images. K is number of cameras.
                     Images should be in range [0, 1].
             precomputed_features: (B, K, N_patches, D_dino) - Pre-computed DINO features.
         Returns:
-            fused_features: (B, N, D_point) - Point features enriched with semantic info.
+            global_semantic: (B, D_point) - Global semantic feature from DINO.
         """
-        B, N, D_point = point_features.shape
-        
-        # Add Point Positional Embedding
-        if point_coords is not None:
-            point_pos_emb = self.point_pos_proj(point_coords)
-            point_features = point_features + point_pos_emb
-        
         # --- Step 1: Vision (Frozen DINO) ---
         if precomputed_features is not None:
             # Use pre-computed features
             # Shape: (B, K, N_patches, D_dino)
-            # We need to flatten K and N_patches
             B, K, N_patches, D_dino = precomputed_features.shape
             patch_features = rearrange(precomputed_features, 'b k n d -> (b k) n d')
         else:
@@ -152,46 +122,16 @@ class SemanticGeometricFusion(nn.Module):
             # Get N_patches from output
             _, N_patches, _ = patch_features.shape
             
-        # Reshape to (B, K, N_patches, D_dino) to apply embeddings
+        # Reshape to (B, K, N_patches, D_dino)
         visual_tokens = rearrange(patch_features, '(b k) n d -> b k n d', b=B, k=K)
         
         # Project to d_point
         visual_tokens = self.visual_proj(visual_tokens) # (B, K, N_patches, D_point)
         
-        # Add Positional Embeddings
-        # Slice embeddings to match current K and N_patches
-        curr_k = min(K, self.cam_embed.shape[1])
-        curr_n = min(N_patches, self.pos_embed.shape[2])
-        
-        cam_emb = self.cam_embed[:, :curr_k, :, :]
-        pos_emb = self.pos_embed[:, :, :curr_n, :]
-        
-        # If actual K or N is larger than max, we might have an issue, but usually max is set large enough.
-        # For safety, we can repeat or interpolate if needed, but slicing is standard for fixed max.
-        if K > self.cam_embed.shape[1]:
-             print(f"Warning: Input cameras {K} > Max cameras {self.cam_embed.shape[1]}. Embeddings will be repeated.")
-             # Simple fallback: repeat
-             cam_emb = torch.cat([cam_emb] * (K // self.cam_embed.shape[1] + 1), dim=1)[:, :K, :, :]
-             
-        visual_tokens = visual_tokens + cam_emb + pos_emb
-        
-        # Flatten for Attention: (B, K*N_patches, D_point)
+        # Flatten for global pooling: (B, K*N_patches, D_point)
         visual_tokens = rearrange(visual_tokens, 'b k n d -> b (k n) d')
         
-        # Apply LayerNorm before Attention
-        visual_tokens = self.vis_norm(visual_tokens)
-        point_features_norm = self.point_norm(point_features)
+        # Pool visual tokens for global semantic feature
+        global_semantic = torch.max(visual_tokens, dim=1)[0]
         
-        # --- Step 2: Fusion (Cross Attention) ---
-        attn_output, _ = self.cross_attn(
-            query=point_features_norm,
-            key=visual_tokens,
-            value=visual_tokens
-        )
-        
-        # --- Step 3: Residual + Norm ---
-        # Note: We add residual to original point_features (not normed one), standard Pre-Norm/Post-Norm variation
-        # Here we use Post-Norm style for the residual block as originally implemented
-        fused_features = self.layer_norm(point_features + torch.tanh(self.gate) * attn_output)
-        
-        return fused_features
+        return global_semantic
