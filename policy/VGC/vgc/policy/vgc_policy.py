@@ -253,7 +253,11 @@ class VGCPolicy(BasePolicy):
         
         # Combine
         features = torch.cat([global_point, global_semantic, agent_pos_emb], dim=-1)
-        # Reshape back
+        
+        # Predict Keypose
+        pred_keypose = self.keypose_head(features)
+        
+        # Reshape back to (B, T, ...)
         features = rearrange(features, '(b t) d -> b t d', b=B, t=T)
         pred_keypose = rearrange(pred_keypose, '(b t) d -> b t d', b=B, t=T)
         
@@ -263,13 +267,9 @@ class VGCPolicy(BasePolicy):
         keypose_emb = self.keypose_emb_mlp(pred_keypose_flat)
         keypose_emb = rearrange(keypose_emb, '(b t) d -> b t d', b=B, t=T)
         
-        # 2. Combine
+        # 2. Combine all contextual features
         n_obs = self.n_obs_steps
         global_cond = torch.cat([features[:, :n_obs, :], keypose_emb[:, :n_obs, :]], dim=-1)
-        global_cond = rearrange(global_cond, 'b t d -> b (t d)')
-        
-        # Diffusion Sampling
-        global_cond = torch.cat([cond_features, cond_keypose], dim=-1)
         global_cond = rearrange(global_cond, 'b t d -> b (t d)')
         
         # Diffusion Sampling
@@ -277,7 +277,7 @@ class VGCPolicy(BasePolicy):
         naction = torch.randn((B, self.horizon, self.action_dim), device=global_cond.device)
         
         # DDPM/DDIM Scheduler Sampling
-        self.noise_scheduler.set_timesteps(self.noise_scheduler.config.num_train_timesteps)
+        self.noise_scheduler.set_timesteps(self.num_inference_steps if hasattr(self, 'num_inference_steps') else 100)
         
         for t in self.noise_scheduler.timesteps:
             # Predict noise
