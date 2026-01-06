@@ -41,6 +41,8 @@ class AIMPolicy(BasePolicy):
                  pointcloud_encoder_cfg=None,
                  use_aux_points=True,
                  aux_point_num=50, # Number of points to generate per gripper
+                 aux_length=0.2,   # Length of the laser beam
+                 aux_radius=0.01,  # Radius of the cylinder
                  **kwargs):
         super().__init__()
         
@@ -48,6 +50,8 @@ class AIMPolicy(BasePolicy):
         self.use_pc_color = use_pc_color
         self.use_aux_points = use_aux_points
         self.aux_point_num = aux_point_num
+        self.aux_length = aux_length
+        self.aux_radius = aux_radius
         
         # 1. Parse shape_meta
         action_shape = shape_meta['action']['shape']
@@ -185,16 +189,16 @@ class AIMPolicy(BasePolicy):
         # 0.3m length cylinder pointing along X-axis
         num_pts = self.aux_point_num # e.g. 50-100
         
-        # 1. Generate points along X-axis (0 to 0.2m)
+        # 1. Generate points along X-axis (0 to aux_length)
         # (N, 3)
-        dists = torch.linspace(0, 0.2, num_pts, device=agent_pos.device, dtype=agent_pos.dtype)
+        dists = torch.linspace(0, self.aux_length, num_pts, device=agent_pos.device, dtype=agent_pos.dtype)
         local_line = torch.stack([dists, torch.zeros_like(dists), torch.zeros_like(dists)], dim=-1) # (N, 3)
         
         # 2. Add some thickness (Cylinder) to make it robust to pointnet sampling? 
         # Or just a line? PointNet works well with lines if density is high.
-        # Let's add small noise to Y and Z to make it a thin tube (radius 0.01m)
+        # Let's add small noise to Y and Z to make it a thin tube
         angle = torch.rand(num_pts, device=agent_pos.device, dtype=agent_pos.dtype) * 2 * np.pi
-        radius = torch.rand(num_pts, device=agent_pos.device, dtype=agent_pos.dtype) * 0.01
+        radius = torch.rand(num_pts, device=agent_pos.device, dtype=agent_pos.dtype) * self.aux_radius
         y_offset = radius * torch.cos(angle)
         z_offset = radius * torch.sin(angle)
         local_cylinder = local_line + torch.stack([torch.zeros_like(dists), y_offset, z_offset], dim=-1)

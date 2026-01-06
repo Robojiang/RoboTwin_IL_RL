@@ -28,7 +28,9 @@ policy:
   # AIM Specific
   use_pc_color: True
   use_aux_points: True
-  aux_point_num: 100
+  aux_point_num: 80 # 每个末端生成的点数
+  aux_length: 0.4 # 激光束长度
+  aux_radius: 0.01 # 圆柱半径
   
   # PointNet Config
   pointcloud_encoder_cfg:
