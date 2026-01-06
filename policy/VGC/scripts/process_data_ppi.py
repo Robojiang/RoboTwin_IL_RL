@@ -46,24 +46,22 @@ def load_hdf5(dataset_path):
 
     return left_gripper, left_arm, right_gripper, right_arm, vector, pointcloud, images, left_endpose, right_endpose
 
-def get_keyframe_mask(left_gripper, right_gripper, left_arm, right_arm, stopping_delta=0.01, gripper_delta=0.05):
+def get_keyframe_mask(left_gripper, right_gripper, left_arm, right_arm, left_endpose, right_endpose, stopping_delta=0.01, gripper_delta=0.05, pos_threshold=0.015):
     """
     Generate keyframe mask based on gripper changes and robot stops.
+    Filters out stops that are spatial duplicates of the previous keyframe.
     """
     length = left_gripper.shape[0]
     mask = np.zeros(length, dtype=bool)
     
-    # 1. Calculate velocities (simple difference)
-    # Arm shape: (T, D)
+    # 1. Calculate velocities
     left_vel = np.linalg.norm(left_arm[1:] - left_arm[:-1], axis=1)
     right_vel = np.linalg.norm(right_arm[1:] - right_arm[:-1], axis=1)
     
-    # Pad velocity to match length (first frame vel=0)
     left_vel = np.insert(left_vel, 0, 0)
     right_vel = np.insert(right_vel, 0, 0)
     
-    # 2. Detect Gripper Changes
-    # Gripper shape: (T, 1) or (T,)
+    # 2. Gripper Changes
     if left_gripper.ndim > 1: left_gripper = left_gripper.flatten()
     if right_gripper.ndim > 1: right_gripper = right_gripper.flatten()
     
@@ -73,28 +71,47 @@ def get_keyframe_mask(left_gripper, right_gripper, left_arm, right_arm, stopping
     left_gripper_diff = np.insert(left_gripper_diff, 0, 0)
     right_gripper_diff = np.insert(right_gripper_diff, 0, 0)
     
-    # Logic
     last_keyframe_idx = 0
     mask[0] = True # Always include start
     
+    # Extract positions for distance check
+    # endpose shape (T, 7), take first 3 for XYZ
+    l_pos = left_endpose[:, :3]
+    r_pos = right_endpose[:, :3]
+    
     for i in range(1, length):
-        is_keyframe = False
+        is_gripper_change = False
         
         # Condition A: Gripper Changed significantly
         if left_gripper_diff[i] > gripper_delta or right_gripper_diff[i] > gripper_delta:
-            is_keyframe = True
+            is_gripper_change = True
             
-        # Condition B: Robot Stopped (Both arms)
-        # We check if velocity is low AND it wasn't low before (to capture the moment of stopping)
-        # Or just sample points where it is stopped? 
-        # Usually "keyframe" implies sparse. If it stops for 100 frames, we don't want 100 keyframes.
-        # We want the point where it *becomes* stopped, or the middle of a stop.
-        # Let's stick to the user's logic: "is_stopped"
+        # Condition B: Robot Stopped
         is_stopped = (left_vel[i] < stopping_delta) and (right_vel[i] < stopping_delta)
         
-        # To avoid dense keyframes during a stop, we enforce a min distance
-        if (i - last_keyframe_idx) > 10: # Minimum interval
-            if is_keyframe or is_stopped:
+        # Check spatial distance from last keyframe
+        curr_l = l_pos[i]
+        curr_r = r_pos[i]
+        last_l = l_pos[last_keyframe_idx]
+        last_r = r_pos[last_keyframe_idx]
+        
+        dist_l = np.linalg.norm(curr_l - last_l)
+        dist_r = np.linalg.norm(curr_r - last_r)
+        
+        # Logic: 
+        # 1. If Grip Change: Always Keyframe (state change is critical)
+        # 2. If Stopped: Only Keyframe if moved far enough OR simply too much time passed (optional, but better to rely on dist)
+        
+        is_far_enough = (dist_l > pos_threshold) or (dist_r > pos_threshold)
+        
+        # Enforce min time interval to filter jitter
+        if (i - last_keyframe_idx) > 5: 
+            if is_gripper_change:
+                # Gripper change is always a keyframe
+                mask[i] = True
+                last_keyframe_idx = i
+            elif is_stopped and is_far_enough:
+                 # Only record stop if we actually moved somewhere new
                 mask[i] = True
                 last_keyframe_idx = i
                 
@@ -151,7 +168,7 @@ def main():
             continue
 
         # Calculate Keyframe Mask
-        full_mask = get_keyframe_mask(left_gripper, right_gripper, left_arm, right_arm)
+        full_mask = get_keyframe_mask(left_gripper, right_gripper, left_arm, right_arm, left_endpose, right_endpose)
         
         # Check lengths
         T = vector.shape[0]
