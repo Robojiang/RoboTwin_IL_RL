@@ -1,1 +1,1 @@
-bash eval.sh stack_blocks demo_3d_vision_easy  with_position 0 0
+bash eval.sh stack_blocks_two demo_3d_vision_easy  init 0 0

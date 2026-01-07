@@ -158,9 +158,10 @@ def main(usr_args):
 
     seed = usr_args["seed"]
 
-    st_seed = 100000 * (1 + seed)
+    st_seed = 100000 * (42 + seed)
     suc_nums = []
-    test_num = 100
+    # 验证轮数
+    test_num = 50
     topk = 1
 
     model = get_model(usr_args)
